@@ -55,6 +55,9 @@ class DashRenderer {
         const val VH = 480f
         const val PAGES = 3
 
+        /** Abscisse (repère 800 x 480) où commence l'égaliseur, après la pochette et le titre. */
+        const val MUSIC_EQ_START = 290f
+
         /** Nom de la page suivante, pour le bouton. */
         fun nextPageName(page: Int): String = when (page % PAGES) {
             0 -> "Jauges"
@@ -132,8 +135,10 @@ class DashRenderer {
         vw = if (spread) area.width() / scale else VW
         val ox = if (spread) area.left.toFloat() else area.left + (area.width() - VW * scale) / 2f
         val oy = area.top + (area.height() - VH * scale) / 2f
-        // Par-dessus la 3D, le rideau musique couvre tout le haut de l'écran, d'un bord à l'autre
-        if (transparent) drawMusic(canvas, 0f, canvas.width.toFloat(), scale)
+        // Par-dessus la 3D, l'égaliseur part après la pochette et va jusqu'au bord droit de l'écran
+        if (transparent) {
+            drawMusic(canvas, 0f, ox + MUSIC_EQ_START * scale, canvas.width.toFloat(), scale)
+        }
         canvas.save()
         canvas.translate(ox, oy)
         canvas.scale(scale, scale)
@@ -154,7 +159,7 @@ class DashRenderer {
 
     // ---------------------------------------------------------------- en-tête
 
-    private fun drawHeader(c: Canvas, s: Snapshot, stale: Boolean) {
+    private fun drawHeader(c: Canvas, s: Snapshot, stale: Boolean, dy: Float = 0f) {
         val live = s.state == DataHub.State.CONNECTED && !stale
         fill.color = when {
             s.state == DataHub.State.DEMO -> BLUE
@@ -162,7 +167,7 @@ class DashRenderer {
             s.state == DataHub.State.ERROR -> RED
             else -> AMBER
         }
-        c.drawCircle(10f, 16f, 6f, fill)
+        c.drawCircle(10f, 16f + dy, 6f, fill)
 
         val text = when {
             s.state == DataHub.State.DEMO -> "Mode démo"
@@ -171,9 +176,7 @@ class DashRenderer {
             else -> s.message
         }
         setLabel(17f, MUTED, 0.02f)
-        // Sur la page 3D, le bandeau musique occupe le haut au centre
-        val maxW = 470f
-        c.drawText(ellipsize(text, maxW), 24f, 22f, label)
+        c.drawText(ellipsize(text, 470f), 24f, 22f + dy, label)
 
         if (!stale) {
             var right = vw
@@ -223,10 +226,11 @@ class DashRenderer {
         val live = isLive(s)
         if (!overlay) {
             scene.draw(c, d, live, s.cal.redline)
-            drawMusic(c, 0f, vw, 1f)
+            drawMusic(c, 0f, MUSIC_EQ_START, vw, 1f)
         }
-        drawHeader(c, s, stale)
-        drawMusicTile(c)
+        drawMusicHead(c)
+        // Avec de la musique, l'état de la liaison passe sous la pochette
+        drawHeader(c, s, stale, if (MusicRelay.title != null) 58f else 0f)
         val accent = Accent.color(d.rpm, s.cal.redline, live)
         // Rupteur : cadre rouge qui clignote (la version 2D le dessine elle-même)
         if (overlay && live && d.rpm >= s.cal.redline && (SystemClock.elapsedRealtime() / 125) % 2 == 0L) {
@@ -279,111 +283,73 @@ class DashRenderer {
 
     private val curtain = SpectrumCurtain()
 
-    /** Égaliseur en rideau (voir [SpectrumCurtain]) ; rien s'il n'y a pas de morceau en cours. */
-    private fun drawMusic(c: Canvas, left: Float, width: Float, unit: Float) {
+    /**
+     * Égaliseur en rideau (voir [SpectrumCurtain]) de [eqLeft] jusqu'à [right], et ligne
+     * d'avancement sur tout le bord du haut depuis [left]. Rien s'il n'y a pas de morceau.
+     */
+    private fun drawMusic(c: Canvas, left: Float, eqLeft: Float, right: Float, unit: Float) {
         if (MusicRelay.title == null) return
-        curtain.draw(c, left, width, unit, MusicRelay.playing, MusicRelay.progress())
+        curtain.draw(c, eqLeft, right - eqLeft, unit, MusicRelay.playing)
+        curtain.drawProgress(c, left, right - left, unit, MusicRelay.progress())
     }
 
     private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val tilePath = Path()
     private val tileBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f
+        strokeWidth = 1.2f
         color = Color.argb(150, Color.red(TEAL), Color.green(TEAL), Color.blue(TEAL))
     }
-    private val tileShade = Paint()
     private val tileBg = Paint()
-    private val chip = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val artSrc = Rect()
 
     /**
-     * Vignette du morceau en cours, à gauche sous l'en-tête : pochette en grand,
-     * titre (deux lignes au plus) et artiste posés sur un dégradé sombre en bas.
+     * Début du bandeau musique, en haut à gauche : petite pochette rectangulaire (le centre
+     * de la pochette carrée), puis titre et artiste. L'égaliseur prend la suite vers la droite.
      */
-    private fun drawMusicTile(c: Canvas) {
+    private fun drawMusicHead(c: Canvas) {
         val title = MusicRelay.title ?: return
-        val x = 20f
-        val y = 40f
-        val size = 132f
-        if (tileShade.shader == null) {
-            tileShade.shader = LinearGradient(
-                0f, y + size * 0.36f, 0f, y + size,
-                0, Color.argb(220, 10, 6, 20), Shader.TileMode.CLAMP,
-            )
-            tileBg.shader = LinearGradient(
-                x, y, x + size, y + size,
-                intArrayOf(Color.rgb(255, 120, 200), Color.rgb(185, 140, 255), Color.rgb(130, 215, 255)),
-                null, Shader.TileMode.CLAMP,
-            )
-        }
-        rect.set(x, y, x + size, y + size)
+        val x = 14f
+        val y = 7f
+        rect.set(x, y, x + 74f, y + 48f)
         tilePath.reset()
-        tilePath.addRoundRect(rect, 14f, 14f, Path.Direction.CW)
-        c.save()
-        c.clipPath(tilePath)
+        tilePath.addRoundRect(rect, 7f, 7f, Path.Direction.CW)
         val art = MusicRelay.art
         if (art != null) {
-            c.drawBitmap(art, null, rect, artPaint)
+            val cut = (art.height * 0.18f).toInt()
+            artSrc.set(0, cut, art.width, art.height - cut)
+            c.save()
+            c.clipPath(tilePath)
+            c.drawBitmap(art, artSrc, rect, artPaint)
+            c.restore()
         } else {
-            c.drawRect(rect, tileBg)
-            setLabel(44f, Color.argb(200, 255, 255, 255), 0f)
+            if (tileBg.shader == null) {
+                tileBg.shader = LinearGradient(
+                    x, y, x + 74f, y + 48f,
+                    intArrayOf(Color.rgb(255, 120, 200), Color.rgb(185, 140, 255), Color.rgb(130, 215, 255)),
+                    null, Shader.TileMode.CLAMP,
+                )
+            }
+            c.drawPath(tilePath, tileBg)
+            setLabel(24f, Color.argb(210, 255, 255, 255), 0f)
             label.textAlign = Paint.Align.CENTER
-            c.drawText("♪", x + size / 2f, y + size * 0.42f, label)
+            c.drawText("♪", rect.centerX(), rect.centerY() + 9f, label)
             label.textAlign = Paint.Align.LEFT
         }
-        c.drawRect(x, y + size * 0.36f, x + size, y + size, tileShade)
-        c.restore()
-        c.drawRoundRect(rect, 14f, 14f, tileBorder)
+        c.drawRoundRect(rect, 7f, 7f, tileBorder)
 
-        // En pause : petite pastille en haut à gauche de la vignette
-        if (!MusicRelay.playing) {
-            setLabel(11f, TEXT, 0.02f)
-            val w = label.measureText("En pause") + 14f
-            rect.set(x + 8f, y + 8f, x + 8f + w, y + 26f)
-            chip.color = Color.argb(190, 10, 6, 20)
-            c.drawRoundRect(rect, 9f, 9f, chip)
-            c.drawText("En pause", x + 15f, y + 21f, label)
-        }
-
-        // Titre et artiste, du bas vers le haut
-        val inner = size - 20f
-        setLabel(12.5f, Color.rgb(214, 196, 240), 0.01f)
-        val artist = MusicRelay.artist?.takeIf { it.isNotBlank() }
-        var base = y + size - 11f
-        if (artist != null) {
-            c.drawText(fit(label, artist, inner), x + 10f, base, label)
-            base -= 19f
-        }
-        value.textSize = 16.5f
+        val tx = x + 74f + 11f
+        val tw = MUSIC_EQ_START - tx - 14f
+        value.textSize = 16f
         value.color = TEXT
-        val lines = wrap(value, title, inner, 2)
-        for (i in lines.indices.reversed()) {
-            c.drawText(lines[i], x + 10f, base, value)
-            base -= 19f
-        }
-    }
-
-    /** Coupe [text] en lignes de [maxWidth] au plus ; la dernière est raccourcie si besoin. */
-    private fun wrap(p: Paint, text: String, maxWidth: Float, maxLines: Int): List<String> {
-        val out = ArrayList<String>()
-        var line = ""
-        val words = text.split(' ').filter { it.isNotEmpty() }
-        var i = 0
-        while (i < words.size) {
-            val w = words[i]
-            val candidate = if (line.isEmpty()) w else "$line $w"
-            if (p.measureText(candidate) <= maxWidth || line.isEmpty()) {
-                line = candidate
-                i++
-            } else {
-                out.add(line)
-                line = ""
-                if (out.size == maxLines - 1) break
-            }
-        }
-        val rest = if (i < words.size) (listOf(line) + words.drop(i)).filter { it.isNotEmpty() }.joinToString(" ") else line
-        if (rest.isNotEmpty()) out.add(fit(p, rest, maxWidth))
-        return out.map { fit(p, it, maxWidth) }
+        value.setShadowLayer(4f, 0f, 0f, Color.argb(200, 10, 6, 20))
+        c.drawText(fit(value, title, tw), tx, y + 20f, value)
+        value.clearShadowLayer()
+        setLabel(12.5f, Color.rgb(214, 196, 240), 0.01f)
+        label.setShadowLayer(4f, 0f, 0f, Color.argb(200, 10, 6, 20))
+        val sub = if (MusicRelay.playing) MusicRelay.artist.orEmpty() else "En pause"
+        if (sub.isNotBlank()) c.drawText(fit(label, sub, tw), tx, y + 39f, label)
+        label.clearShadowLayer()
     }
 
     // ---------------------------------------------------------- page principale

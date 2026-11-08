@@ -7,30 +7,29 @@ import android.graphics.Paint
 import android.graphics.Shader
 import android.os.SystemClock
 import fr.preludedash.shared.Palette
-import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Égaliseur en rideau sur toute la largeur du haut de l'écran : de fines lignes qui pendent
+ * Égaliseur en rideau en haut de l'écran, à la suite de la pochette : de fines lignes qui pendent
  * du bord supérieur et s'effacent en descendant, pour se fondre dans le décor.
  * Ambiance nightcore / lofi : rose, lavande et bleu ciel pastel, petites crêtes qui retombent.
  *
- * Basses sur les côtés (lignes longues), aigus au centre (lignes courtes) : le milieu de la
- * scène reste dégagé. La ligne turquoise du bord supérieur montre l'avancement du morceau.
+ * Basses à gauche (lignes longues), aigus à droite (lignes courtes), comme sur une chaîne hi-fi.
+ * La ligne turquoise du bord supérieur montre l'avancement du morceau.
  *
  * Ce n'est pas le vrai son (Spotify ne le partage pas) : animation plausible sur un tempo lofi,
  * active seulement quand un morceau est en lecture.
  */
-class SpectrumCurtain(private val bands: Int = 96) {
+class SpectrumCurtain(private val bands: Int = 80) {
 
     private val level = FloatArray(bands)
     private val smooth = FloatArray(bands)
     private val peak = FloatArray(bands)
     private val hold = FloatArray(bands)
-    private val freq = FloatArray(bands)   // 0 = basses (bords), 1 = aigus (centre)
+    private val freq = FloatArray(bands)   // 0 = basses (à gauche), 1 = aigus (à droite)
     private val env = FloatArray(bands)    // longueur maximale de chaque ligne
     private val f1 = FloatArray(bands) { 0.9f + 2.2f * hash(it * 3 + 1) }
     private val f2 = FloatArray(bands) { 2.7f + 4.6f * hash(it * 7 + 2) }
@@ -54,10 +53,11 @@ class SpectrumCurtain(private val bands: Int = 96) {
 
     init {
         for (b in 0 until bands) {
+            // Comme un vrai analyseur : basses à gauche (juste après la pochette), aigus à droite,
+            // avec une entrée en douceur près du titre
             val u = (b + 0.5f) / bands
-            val dc = abs(u - 0.5f) * 2f       // 0 au centre, 1 sur les bords
-            freq[b] = 1f - dc
-            env[b] = 0.35f + 0.65f * smoothstep(0.1f, 0.65f, dc) - 0.25f * smoothstep(0.85f, 1f, dc)
+            freq[b] = u
+            env[b] = (1f - 0.5f * u) * (0.35f + 0.65f * smoothstep(0f, 0.08f, u))
         }
     }
 
@@ -65,7 +65,7 @@ class SpectrumCurtain(private val bands: Int = 96) {
      * Dessine le rideau sur [width] pixels à partir de [left], en haut du canevas.
      * [unit] = taille d'un pixel du repère 800 x 480 (mise à l'échelle de l'écran).
      */
-    fun draw(c: Canvas, left: Float, width: Float, unit: Float, playing: Boolean, progress: Float?) {
+    fun draw(c: Canvas, left: Float, width: Float, unit: Float, playing: Boolean) {
         val now = SystemClock.elapsedRealtime()
         val dt = if (lastMs == 0L) 0.033f else ((now - lastMs) / 1000f).coerceIn(0f, 0.1f)
         lastMs = now
@@ -91,7 +91,11 @@ class SpectrumCurtain(private val bands: Int = 96) {
             }
         }
 
-        // Bord supérieur turquoise = avancement du morceau
+    }
+
+    /** Bord supérieur turquoise sur [width] pixels = avancement du morceau. */
+    fun drawProgress(c: Canvas, left: Float, width: Float, unit: Float, progress: Float?) {
+        shaders(165f * unit, unit)
         c.drawRect(left, 0f, left + width, 14f * unit, ceilGlow)
         line.color = alpha(teal, 70)
         c.drawRect(left, 0f, left + width, 2.4f * unit, line)
