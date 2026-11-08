@@ -25,7 +25,17 @@ jobs:
 
       - name: Tests et compilation
         shell: bash
-        run: gradle --no-daemon --stacktrace testReleaseUnitTest assembleRelease 2>&1 | tee build.log
+        # Jusqu'à 3 essais : les téléchargements de dépendances échouent parfois par timeout réseau
+        run: |
+          for i in 1 2 3; do
+            gradle --no-daemon --stacktrace \
+              -Dorg.gradle.internal.http.socketTimeout=180000 \
+              -Dorg.gradle.internal.http.connectionTimeout=180000 \
+              testReleaseUnitTest assembleRelease 2>&1 | tee build.log && exit 0
+            echo "Essai $i raté, nouvel essai dans 15 s"
+            sleep 15
+          done
+          exit 1
 
       - name: Renommer l'APK
         run: cp app/build/outputs/apk/release/app-release.apk PreludeDash.apk
