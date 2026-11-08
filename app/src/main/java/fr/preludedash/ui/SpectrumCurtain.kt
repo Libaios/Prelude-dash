@@ -57,7 +57,7 @@ class SpectrumCurtain(private val bands: Int = 80) {
             // avec une entrée en douceur près du titre
             val u = (b + 0.5f) / bands
             freq[b] = u
-            env[b] = (1f - 0.5f * u) * (0.35f + 0.65f * smoothstep(0f, 0.08f, u))
+            env[b] = (1f - 0.5f * u) * (0.6f + 0.4f * smoothstep(0f, 0.04f, u))
         }
     }
 

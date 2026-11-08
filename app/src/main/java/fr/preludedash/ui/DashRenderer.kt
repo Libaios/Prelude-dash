@@ -19,6 +19,7 @@ import fr.preludedash.shared.Palette
 import fr.preludedash.ui.scene.SceneRenderer
 import java.util.Locale
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -55,8 +56,9 @@ class DashRenderer {
         const val VH = 480f
         const val PAGES = 3
 
-        /** Abscisse (repère 800 x 480) où commence l'égaliseur, après la pochette et le titre. */
-        const val MUSIC_EQ_START = 290f
+        /** Texte du morceau : abscisse et largeur maximale (repère 800 x 480). */
+        private const val MUSIC_TEXT_X = 99f
+        private const val MUSIC_TEXT_MAX = 190f
 
         /** Nom de la page suivante, pour le bouton. */
         fun nextPageName(page: Int): String = when (page % PAGES) {
@@ -137,7 +139,7 @@ class DashRenderer {
         val oy = area.top + (area.height() - VH * scale) / 2f
         // Par-dessus la 3D, l'égaliseur part après la pochette et va jusqu'au bord droit de l'écran
         if (transparent) {
-            drawMusic(canvas, 0f, ox + MUSIC_EQ_START * scale, canvas.width.toFloat(), scale)
+            drawMusic(canvas, 0f, ox + musicEqStart() * scale, canvas.width.toFloat(), scale)
         }
         canvas.save()
         canvas.translate(ox, oy)
@@ -226,7 +228,7 @@ class DashRenderer {
         val live = isLive(s)
         if (!overlay) {
             scene.draw(c, d, live, s.cal.redline)
-            drawMusic(c, 0f, MUSIC_EQ_START, vw, 1f)
+            drawMusic(c, 0f, musicEqStart(), vw, 1f)
         }
         drawMusicHead(c)
         // Avec de la musique, l'état de la liaison passe sous la pochette
@@ -303,6 +305,17 @@ class DashRenderer {
     private val tileBg = Paint()
     private val artSrc = Rect()
 
+    /** L'égaliseur démarre juste après le titre ou l'artiste (le plus long des deux). */
+    private fun musicEqStart(): Float {
+        val title = MusicRelay.title ?: return MUSIC_TEXT_X + MUSIC_TEXT_MAX
+        value.textSize = 16f
+        val tw = value.measureText(title)
+        setLabel(12.5f, MUTED, 0.01f)
+        val sub = if (MusicRelay.playing) MusicRelay.artist.orEmpty() else "En pause"
+        val aw = label.measureText(sub)
+        return MUSIC_TEXT_X + min(MUSIC_TEXT_MAX, max(tw, aw)) + 12f
+    }
+
     /**
      * Début du bandeau musique, en haut à gauche : petite pochette rectangulaire (le centre
      * de la pochette carrée), puis titre et artiste. L'égaliseur prend la suite vers la droite.
@@ -338,8 +351,8 @@ class DashRenderer {
         }
         c.drawRoundRect(rect, 7f, 7f, tileBorder)
 
-        val tx = x + 74f + 11f
-        val tw = MUSIC_EQ_START - tx - 14f
+        val tx = MUSIC_TEXT_X
+        val tw = MUSIC_TEXT_MAX
         value.textSize = 16f
         value.color = TEXT
         value.setShadowLayer(4f, 0f, 0f, Color.argb(200, 10, 6, 20))
