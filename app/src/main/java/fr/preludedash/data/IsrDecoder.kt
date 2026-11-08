@@ -71,15 +71,29 @@ object IsrDecoder {
         return if (a in 5f..30f) a else null
     }
 
-    fun ethanol(f: ByteArray, cal: Calibration): Float? {
+    /** % d'éthanol brut, avant correction (ce que HTS afficherait sans offset). */
+    fun ethanolBase(f: ByteArray, cal: Calibration): Float? {
         if (cal.ethByte < 0 || cal.ethByte >= f.size) return null
         val v = u8(f, cal.ethByte)
-        val pct = when (cal.ethScale) {
-            Calibration.ETH_255 -> v / 2.55f
-            Calibration.ETH_HALF -> v / 2f
-            else -> v.toFloat()
-        }
-        return pct.coerceIn(0f, 100f)
+        return scaleEth(v, cal.ethScale)
+    }
+
+    /** % d'éthanol corrigé : brut x gain + offset, comme le réglage de HTS. */
+    fun ethanol(f: ByteArray, cal: Calibration): Float? {
+        val base = ethanolBase(f, cal) ?: return null
+        return (base * cal.ethGain + cal.ethOffset).coerceIn(0f, 100f)
+    }
+
+    /** Offset à mettre pour que l'appli affiche [targetPct] (le % lu dans HTS). */
+    fun offsetFor(f: ByteArray, cal: Calibration, targetPct: Float): Float? {
+        val base = ethanolBase(f, cal) ?: return null
+        return targetPct - base * cal.ethGain
+    }
+
+    private fun scaleEth(v: Int, scale: Int): Float = when (scale) {
+        Calibration.ETH_255 -> v / 2.55f
+        Calibration.ETH_HALF -> v / 2f
+        else -> v.toFloat()
     }
 
     fun decode(f: ByteArray, cal: Calibration): EngineData {
@@ -110,14 +124,24 @@ object IsrDecoder {
         )
     }
 
-    /** Cherche les octets qui pourraient porter l'éthanol, à partir du % lu dans HTS. */
-    fun findEthanolCandidates(f: ByteArray, targetPct: Float): List<Pair<Int, Int>> {
+    /**
+     * Cherche les octets qui pourraient porter l'éthanol, à partir du % lu dans HTS.
+     * Le % de HTS inclut sa correction : on la retire avant de comparer aux valeurs brutes.
+     */
+    fun findEthanolCandidates(
+        f: ByteArray,
+        targetPct: Float,
+        gain: Float = 1f,
+        offset: Float = 0f,
+    ): List<Pair<Int, Int>> {
+        val g = if (abs(gain) < 0.01f) 1f else gain
+        val raw = (targetPct - offset) / g
         val out = mutableListOf<Pair<Int, Int>>()
         for (i in f.indices) {
             val v = u8(f, i)
-            if (abs(v - targetPct) <= 1f) out += i to Calibration.ETH_PERCENT
-            if (abs(v / 2.55f - targetPct) <= 1.5f) out += i to Calibration.ETH_255
-            if (abs(v / 2f - targetPct) <= 1f) out += i to Calibration.ETH_HALF
+            if (abs(v - raw) <= 1f) out += i to Calibration.ETH_PERCENT
+            if (abs(v / 2.55f - raw) <= 1.5f) out += i to Calibration.ETH_255
+            if (abs(v / 2f - raw) <= 1f) out += i to Calibration.ETH_HALF
         }
         return out
     }

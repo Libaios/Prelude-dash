@@ -23,6 +23,8 @@ object CalStore {
             .putFloat("afrA2", c.afrA2)
             .putInt("ethByte", c.ethByte)
             .putInt("ethScale", c.ethScale)
+            .putFloat("ethGain", c.ethGain)
+            .putFloat("ethOffset", c.ethOffset)
             .putInt("mapMin", c.mapMin)
             .putInt("mapMax", c.mapMax)
             .putInt("redline", c.redline)
@@ -45,6 +47,8 @@ object CalStore {
             afrA2 = p.getFloat("afrA2", d.afrA2),
             ethByte = p.getInt("ethByte", d.ethByte),
             ethScale = p.getInt("ethScale", d.ethScale),
+            ethGain = p.getFloat("ethGain", d.ethGain),
+            ethOffset = p.getFloat("ethOffset", d.ethOffset),
             mapMin = p.getInt("mapMin", d.mapMin),
             mapMax = p.getInt("mapMax", d.mapMax),
             redline = p.getInt("redline", d.redline),

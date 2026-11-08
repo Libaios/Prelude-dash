@@ -80,7 +80,8 @@ première fois (Shizuku doit tourner). Tes réglages sont conservés.
 |---|---|---|
 | Octet wideband | 2 | entrée sonde O2 de l'ECU (D14) |
 | Conversion AFR | 0,5 V = 8,5 / 4,5 V = 18,0 | sortie analogique AEM 30-0300 |
-| Octet éthanol | à trouver | position injectée par la CobraRTP inconnue |
+| Octet éthanol | 32 | sortie éthanol de la CobraRTP, trouvée sur la voiture |
+| Correction éthanol | brut + 14 % (gain 1) | même offset que dans HTS (66 % brut = 80 %) |
 | MAP | -70 à 1790 mbar | capteur MAP Honda d'origine |
 | Zone rouge | 7000 tr/min | modifiable |
 | Taille de trame | 52 octets | protocole ISR V3 |

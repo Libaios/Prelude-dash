@@ -159,6 +159,11 @@ class MainActivity : Activity() {
         ethScaleGroup.check(1000 + cal.ethScale)
         col.addView(ethScaleGroup)
         col.addView(row(
+            field("ethOffset", "Offset éthanol (%)", fmt(cal.ethOffset), decimal = true, signed = true),
+            field("ethGain", "Gain éthanol (x)", fmt(cal.ethGain), decimal = true),
+        ))
+        col.addView(hint("Mets le même offset que dans HTS. Gain à 1 tant qu'un 2e point de mesure ne dit pas le contraire."))
+        col.addView(row(
             field("redline", "Zone rouge (tr/min)", cal.redline.toString(), decimal = false),
             field("frameLen", "Taille de trame", cal.frameLen.toString(), decimal = false),
         ))
@@ -168,11 +173,11 @@ class MainActivity : Activity() {
         ))
         col.addView(button("Enregistrer les réglages") { saveSettings() }, lp(top = 8))
 
-        // Trouver l'éthanol
-        col.addView(section("Trouver l'octet éthanol"))
+        // Éthanol
+        col.addView(section("Éthanol : caler sur HTS"))
         col.addView(hint(
-            "Moteur tournant et ECU connecté, tape le % d'éthanol affiché dans HTS, puis Chercher. " +
-                "Si plusieurs octets sortent, garde celui qui ne bouge pas quand tu donnes un coup de gaz.",
+            "ECU connecté, tape le % d'éthanol affiché dans HTS. Caler sur HTS règle l'offset pour afficher " +
+                "la même valeur. Chercher retrouve l'octet si tu changes de config.",
         ))
         val ethInput = EditText(this).apply {
             hint = "ex : 78"
@@ -180,7 +185,11 @@ class MainActivity : Activity() {
             setTextColor(DashRenderer.TEXT)
             setHintTextColor(DashRenderer.MUTED)
         }
-        col.addView(row(ethInput, button("Chercher") { findEthanol(ethInput.text.toString()) }))
+        col.addView(row(
+            ethInput,
+            button("Caler sur HTS") { calibrateEthanol(ethInput.text.toString()) },
+            button("Chercher") { findEthanol(ethInput.text.toString()) },
+        ))
         candidatesBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(candidatesBox)
 
@@ -284,6 +293,8 @@ class MainActivity : Activity() {
             afrA2 = float("afrA2", c.afrA2),
             ethByte = int("ethByte", c.ethByte).coerceIn(-1, 255),
             ethScale = if (scaleId >= 1000) scaleId - 1000 else c.ethScale,
+            ethOffset = float("ethOffset", c.ethOffset).coerceIn(-100f, 100f),
+            ethGain = float("ethGain", c.ethGain).let { if (it in 0.2f..5f) it else c.ethGain },
             redline = int("redline", c.redline).coerceIn(3000, 11000),
             frameLen = int("frameLen", c.frameLen).coerceIn(8, 255),
             mapMin = int("mapMin", c.mapMin),
@@ -305,7 +316,8 @@ class MainActivity : Activity() {
             candidatesBox.addView(hint("Pas de trame reçue : connecte d'abord l'ECU (contact mis)."))
             return
         }
-        val found = IsrDecoder.findEthanolCandidates(raw, target)
+        val cal = CalStore.get(this)
+        val found = IsrDecoder.findEthanolCandidates(raw, target, cal.ethGain, cal.ethOffset)
         if (found.isEmpty()) {
             candidatesBox.addView(hint("Aucun octet ne correspond. Vérifie que la sortie éthanol vers le datalog est activée dans CobraRTP Utility."))
             return
@@ -319,6 +331,28 @@ class MainActivity : Activity() {
                 toast("Éthanol réglé sur l'octet $index")
             }, lp(top = 4))
         }
+    }
+
+    private fun calibrateEthanol(input: String) {
+        val target = input.replace(',', '.').trim().toFloatOrNull()
+        if (target == null) {
+            toast("Tape le % d'éthanol affiché dans HTS")
+            return
+        }
+        val cal = CalStore.get(this)
+        val raw = DataHub.data.raw
+        if (raw.isEmpty()) {
+            toast("Connecte d'abord l'ECU (contact mis)")
+            return
+        }
+        val offset = IsrDecoder.offsetFor(raw, cal, target)
+        if (offset == null) {
+            toast("Règle d'abord l'octet éthanol")
+            return
+        }
+        CalStore.save(this, cal.copy(ethOffset = offset))
+        fields["ethOffset"]?.setText(fmt(offset))
+        toast("Offset éthanol réglé à ${fmt(offset)} %")
     }
 
     // ---------------------------------------------------------------- outils

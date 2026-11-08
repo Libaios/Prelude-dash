@@ -54,11 +54,34 @@ class IsrDecoderTest {
     }
 
     @Test
-    fun ethanol_off_by_default_then_scaled() {
+    fun ethanol_off_when_no_byte_then_scaled() {
         val f = frame(51 to 199)
-        assertNull(IsrDecoder.decode(f, Calibration()).ethanolPct)
-        val cal = Calibration(ethByte = 51, ethScale = Calibration.ETH_255)
+        assertNull(IsrDecoder.decode(f, Calibration(ethByte = -1)).ethanolPct)
+        val cal = Calibration(ethByte = 51, ethScale = Calibration.ETH_255, ethOffset = 0f)
         assertEquals(78.0, IsrDecoder.decode(f, cal).ethanolPct!!.toDouble(), 0.1)
+    }
+
+    @Test
+    fun ethanol_default_is_byte_32_plus_14() {
+        // La Prelude : 66 % brut dans l'octet 32 = 80 % dans HTS
+        val f = frame(32 to 66)
+        assertEquals(80.0, IsrDecoder.decode(f, Calibration()).ethanolPct!!.toDouble(), 0.01)
+    }
+
+    @Test
+    fun ethanol_offset_and_gain_clamped() {
+        val f = frame(32 to 95)
+        val cal = Calibration(ethOffset = 14f, ethGain = 1f)
+        assertEquals(100.0, IsrDecoder.decode(f, cal).ethanolPct!!.toDouble(), 0.01)
+        val cal2 = Calibration(ethOffset = 0f, ethGain = 1.2f)
+        assertEquals(79.2, IsrDecoder.decode(frame(32 to 66), cal2).ethanolPct!!.toDouble(), 0.01)
+    }
+
+    @Test
+    fun offset_calibration_matches_hts() {
+        val f = frame(32 to 66)
+        val off = IsrDecoder.offsetFor(f, Calibration(), 80f)!!
+        assertEquals(14.0, off.toDouble(), 0.01)
     }
 
     @Test
@@ -66,6 +89,9 @@ class IsrDecoderTest {
         val f = frame(0 to 40, 44 to 78)
         val found = IsrDecoder.findEthanolCandidates(f, 78f)
         assertTrue(found.contains(44 to Calibration.ETH_PERCENT))
+        // Avec l'offset de HTS : 80 % affiché = 66 brut
+        val f2 = frame(32 to 66)
+        assertTrue(IsrDecoder.findEthanolCandidates(f2, 80f, 1f, 14f).contains(32 to Calibration.ETH_PERCENT))
     }
 
     @Test
@@ -79,7 +105,7 @@ class IsrDecoderTest {
 
     @Test
     fun short_frame_does_not_crash() {
-        val d = IsrDecoder.decode(ByteArray(5), Calibration(ethByte = 60))
+        val d = IsrDecoder.decode(ByteArray(5), Calibration())
         assertEquals(0, d.vssKmh)
         assertNull(d.ethanolPct)
     }

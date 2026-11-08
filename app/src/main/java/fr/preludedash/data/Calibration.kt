@@ -12,9 +12,12 @@ data class Calibration(
     val afrA1: Float = 8.5f,
     val afrV2: Float = 4.5f,
     val afrA2: Float = 18.0f,
-    /** Octet qui porte l'éthanol (-1 = pas encore trouvé). */
-    val ethByte: Int = -1,
+    /** Octet qui porte l'éthanol (-1 = pas encore trouvé). 32 sur la Prelude (sortie Cobra). */
+    val ethByte: Int = 32,
     val ethScale: Int = ETH_PERCENT,
+    /** Correction comme dans HTS : % affiché = % lu x gain + offset. */
+    val ethGain: Float = 1f,
+    val ethOffset: Float = 14f,
     /** Plage du capteur MAP d'origine, en mbar, pour 0 V et 5 V. */
     val mapMin: Int = -70,
     val mapMax: Int = 1790,
