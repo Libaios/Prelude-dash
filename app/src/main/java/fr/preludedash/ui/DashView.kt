@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.view.View
 import fr.preludedash.data.CalStore
+import fr.preludedash.ui.scene.Car3D
 import kotlin.math.min
 
 /** Aperçu du tableau de bord sur le téléphone (même rendu que dans la voiture). */
@@ -28,11 +29,13 @@ class DashView(context: Context) : View(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        Car3D.acquire(context)
         post(tick)
     }
 
     override fun onDetachedFromWindow() {
         removeCallbacks(tick)
+        Car3D.release()
         super.onDetachedFromWindow()
     }
 

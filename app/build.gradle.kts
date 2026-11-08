@@ -17,6 +17,8 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
+        // Filament embarque du code natif : on ne garde que les téléphones 64 bits
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     // Clé de signature fixe : toutes les versions sont signées pareil,
@@ -49,6 +51,9 @@ android {
         jvmTarget = "17"
     }
 
+    // Le modèle 3D et l'éclairage sont lus tels quels
+    androidResources { noCompress += listOf("glb", "ktx") }
+
     // Code commun avec l'appli Prelude Carte
     sourceSets["main"].java.srcDir("../shared/java")
 
@@ -60,6 +65,10 @@ android {
 
 dependencies {
     implementation("androidx.car.app:app:1.4.0")
+    // Rendu 3D réaliste (Google Filament) et chargement du modèle glTF
+    implementation("com.google.android.filament:filament-android:1.79.0")
+    implementation("com.google.android.filament:gltfio-android:1.79.0")
+    implementation("com.google.android.filament:filament-utils-android:1.79.0")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-common:2.8.7")
     testImplementation("junit:junit:4.13.2")

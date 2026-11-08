@@ -18,6 +18,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import fr.preludedash.data.CalStore
 import fr.preludedash.link.LinkManager
 import fr.preludedash.ui.DashRenderer
+import fr.preludedash.ui.scene.Car3D
 
 /**
  * Écran Android Auto. L'appli se déclare "navigation" : c'est la seule catégorie
@@ -83,6 +84,7 @@ class DashScreen(carContext: CarContext) : Screen(carContext) {
                 Lifecycle.Event.ON_CREATE -> {
                     carContext.getCarService(AppManager::class.java).setSurfaceCallback(surfaceCallback)
                     LinkManager.acquire(carContext, "car")
+                    Car3D.acquire(carContext)
                 }
                 Lifecycle.Event.ON_START -> {
                     drawing = true
@@ -95,6 +97,7 @@ class DashScreen(carContext: CarContext) : Screen(carContext) {
                 }
                 Lifecycle.Event.ON_DESTROY -> {
                     LinkManager.release("car")
+                    Car3D.release()
                     renderThread.quitSafely()
                 }
                 else -> Unit

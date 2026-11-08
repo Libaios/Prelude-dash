@@ -59,6 +59,7 @@ class SceneRenderer {
 
     // Caméra courante
     private val cam = FloatArray(3)
+    private val target = FloatArray(3)
     private val right = FloatArray(3)
     private val up = FloatArray(3)
     private val fwd = FloatArray(3)
@@ -108,7 +109,7 @@ class SceneRenderer {
         setupCamera(t, rpmFrac)
         drawGrid(c, accent)
         drawShadow(c, accent, rpmFrac)
-        drawCar(c, accent, rpmFrac, t)
+        drawRealisticOrFallback(c, accent, rpmFrac, t)
         if (driving && speedKmh > 70) drawSpeedLines(c, t, (speedKmh - 70) / 90f)
         if (live && rpm >= redline) drawShiftFlash(c, t)
     }
@@ -126,6 +127,9 @@ class SceneRenderer {
 
         val tx = lerp(0f, 0.4f, drive)
         val ty = 0.55f
+        target[0] = tx
+        target[1] = ty
+        target[2] = 0f
         cam[0] = tx + dist * cos(elev) * cos(angle)
         cam[1] = ty + dist * sin(elev) + shake * sin(t * 47f)
         cam[2] = dist * cos(elev) * sin(angle) + shake * cos(t * 39f)
@@ -158,7 +162,7 @@ class SceneRenderer {
 
     private fun px(cx: Float, cz: Float) = VW / 2f + FOCAL * cx / cz
 
-    private fun py(cy: Float, cz: Float) = VH / 2f + 10f - FOCAL * cy / cz
+    private fun py(cy: Float, cz: Float) = VH / 2f - FOCAL * cy / cz
 
     // ----------------------------------------------------------------- décor
 
@@ -239,6 +243,33 @@ class SceneRenderer {
     }
 
     // --------------------------------------------------------------- voiture
+
+    private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val dst = android.graphics.RectF(0f, 0f, VW, VH)
+
+    /**
+     * Voiture réaliste (Filament) si disponible ; sinon le modèle simple dessiné ici.
+     * L'image Filament arrive avec les lignes de bas en haut, d'où le retournement.
+     */
+    private fun drawRealisticOrFallback(c: Canvas, accent: Int, rpmFrac: Float, t: Float) {
+        if (Car3D.failed) {
+            drawCar(c, accent, rpmFrac, t)
+            return
+        }
+        Car3D.submit(
+            Car3D.Params(
+                eye = cam.copyOf(),
+                target = target.copyOf(),
+                wheelAngle = -wheelAngle,
+                accent = floatArrayOf(Color.red(accent) / 255f, Color.green(accent) / 255f, Color.blue(accent) / 255f),
+            ),
+        )
+        val frame = Car3D.frame() ?: return
+        c.save()
+        c.scale(1f, -1f, VW / 2f, VH / 2f)
+        c.drawBitmap(frame, null, dst, bitmapPaint)
+        c.restore()
+    }
 
     private fun drawCar(c: Canvas, accent: Int, rpmFrac: Float, t: Float) {
         // Roues de l'image courante

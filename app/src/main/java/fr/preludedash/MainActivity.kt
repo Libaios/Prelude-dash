@@ -232,6 +232,12 @@ class MainActivity : Activity() {
                 "Paramètres > Applications > Prelude Dash > menu ⋮ > Autoriser les paramètres restreints, puis recommence.",
         ))
 
+        col.addView(section("Crédits"))
+        col.addView(hint(
+            "Modèle 3D : « Honda Prelude 1997 Free » par Black Snow (sketchfab.com/BlackSnow02), " +
+                "licence CC BY 4.0, mis à l'échelle réelle. Rendu 3D : Google Filament (Apache 2.0).",
+        ))
+
         col.addView(section("Android Auto"))
         col.addView(hint(
             "Plein écran : ouvre Prelude Dash depuis le lanceur Android Auto, le bouton Détails change de page. " +
