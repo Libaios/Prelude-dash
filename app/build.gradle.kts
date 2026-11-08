@@ -65,10 +65,11 @@ android {
 
 dependencies {
     implementation("androidx.car.app:app:1.4.0")
-    // Rendu 3D réaliste (Google Filament) et chargement du modèle glTF
-    implementation("com.google.android.filament:filament-android:1.+")
-    implementation("com.google.android.filament:gltfio-android:1.+")
-    implementation("com.google.android.filament:filament-utils-android:1.+")
+    // Rendu 3D réaliste (Google Filament) et chargement du modèle glTF.
+    // 1.75.1 : dernière version compilée pour Android 35 (les suivantes exigent le SDK 37).
+    implementation("com.google.android.filament:filament-android:1.75.1")
+    implementation("com.google.android.filament:gltfio-android:1.75.1")
+    implementation("com.google.android.filament:filament-utils-android:1.75.1")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-common:2.8.7")
     testImplementation("junit:junit:4.13.2")

@@ -9,7 +9,7 @@ import com.google.android.filament.Camera
 import com.google.android.filament.Engine
 import com.google.android.filament.EntityManager
 import com.google.android.filament.LightManager
-import com.google.android.filament.PixelBufferDescriptor
+import com.google.android.filament.SwapChainFlags
 import com.google.android.filament.Renderer
 import com.google.android.filament.Scene
 import com.google.android.filament.SwapChain
@@ -179,7 +179,7 @@ object Car3D {
                 sampleCount = 4
             }
         }
-        swapChain = e.createSwapChain(W, H, SwapChain.CONFIG_TRANSPARENT or SwapChain.CONFIG_READABLE)
+        swapChain = e.createSwapChain(W, H, SwapChainFlags.CONFIG_TRANSPARENT or SwapChainFlags.CONFIG_READABLE)
 
         // Modèle
         val mp = UbershaderProvider(e)
@@ -313,7 +313,7 @@ object Car3D {
         readStartMs = System.currentTimeMillis()
         r.readPixels(
             0, 0, W, H,
-            PixelBufferDescriptor(buf, Texture.Format.RGBA, Texture.Type.UBYTE, 1, 0, 0, 0, handler) {
+            Texture.PixelBufferDescriptor(buf, Texture.Format.RGBA, Texture.Type.UBYTE, 1, 0, 0, 0, handler) {
                 publish(buf)
             },
         )
