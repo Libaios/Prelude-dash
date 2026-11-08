@@ -90,11 +90,21 @@ class CardService : MediaBrowserService() {
     private fun fetch(): CardSnapshot = try {
         val b = contentResolver.call(ShareContract.URI, ShareContract.M_CARD, null, null)
         if (b != null) CardSnapshot.fromBundle(b)
-        else CardSnapshot.offline("Prelude Dash introuvable", "Installe ou ouvre Prelude Dash")
-    } catch (_: SecurityException) {
+        else CardSnapshot.offline("Prelude Dash ne répond pas", "Réponse vide (version ${dashVersion()})")
+    } catch (e: SecurityException) {
         CardSnapshot.offline("Accès refusé", "Réinstalle Prelude Carte après Prelude Dash")
+    } catch (e: IllegalArgumentException) {
+        // Fournisseur inconnu : Prelude Dash absent ou trop ancien (canal ajouté en 1.0.6)
+        CardSnapshot.offline("Prelude Dash à mettre à jour", "Installée : ${dashVersion()}, il faut 1.0.6 ou plus")
+    } catch (e: Exception) {
+        CardSnapshot.offline("Erreur ${e.javaClass.simpleName}", (e.message ?: "sans détail").take(80))
+    }
+
+    /** Version de Prelude Dash installée, pour le diagnostic affiché sur la carte. */
+    private fun dashVersion(): String = try {
+        packageManager.getPackageInfo("fr.preludedash", 0).versionName ?: "?"
     } catch (_: Exception) {
-        CardSnapshot.offline("Prelude Dash introuvable", "Installe ou ouvre Prelude Dash")
+        "pas installée"
     }
 
     private fun publishIfChanged() {
