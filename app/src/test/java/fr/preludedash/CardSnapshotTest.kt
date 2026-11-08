@@ -5,6 +5,7 @@ import fr.preludedash.shared.CardSnapshot
 import fr.preludedash.data.Calibration
 import fr.preludedash.data.EngineData
 import fr.preludedash.link.DataHub
+import fr.preludedash.music.MusicRelay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -36,14 +37,23 @@ class CardSnapshotTest {
         assertEquals("88", s.ect)
         assertEquals("80", s.eth)
         assertNull(s.alert)
-        assertEquals("AFR 14.6   88°C   E80", s.title)
+        assertEquals("Prelude Dash", s.title)
         assertEquals("ECU connecté", s.subtitle)
+        assertEquals("2500", s.rpm)
     }
 
     @Test
-    fun music_goes_in_subtitle() {
-        val s = CardSnapshots.from(data(), DataHub.State.CONNECTED, 100, cal, music = "▶  Titre - Artiste")
-        assertEquals("▶  Titre - Artiste", s.subtitle)
+    fun music_goes_in_the_text_lines() {
+        val s = CardSnapshots.from(data(), DataHub.State.CONNECTED, 100, cal, music = MusicRelay.Now("Titre", "▶  Artiste"))
+        assertEquals("Titre", s.title)
+        assertEquals("▶  Artiste", s.subtitle)
+    }
+
+    @Test
+    fun alert_takes_the_title_over_music() {
+        val s = CardSnapshots.from(data(ect = 107f), DataHub.State.CONNECTED, 100, cal, music = MusicRelay.Now("Titre", "▶  Artiste"))
+        assertEquals("⚠ EAU 107°C", s.title)
+        assertEquals("▶  Artiste", s.subtitle)
     }
 
     @Test
@@ -51,7 +61,7 @@ class CardSnapshotTest {
         val s = CardSnapshots.from(data(afr = 15.8f, tps = 90, ect = 107f), DataHub.State.CONNECTED, 100, cal, music = null)
         assertEquals("PAUVRE", s.alert)
         assertEquals(CardSnapshot.Level.ALERT, s.afrLevel)
-        assertTrue(s.title.startsWith("⚠ PAUVRE"))
+        assertEquals("⚠ PAUVRE", s.title)
     }
 
     @Test

@@ -13,10 +13,15 @@ data class CardSnapshot(
     val eth: String,
     /** Alerte prioritaire (null si tout va bien). */
     val alert: String?,
-    /** Ligne de titre Android Auto : les valeurs, lisibles même sans l'image. */
+    /** Ligne de titre Android Auto : alerte, sinon le morceau en cours. */
     val title: String,
-    /** Ligne de sous-titre : la musique en cours, sinon l'état de la liaison. */
+    /** Ligne de sous-titre : l'artiste, sinon l'état de la liaison. */
     val subtitle: String,
+    // Valeurs des bandes latérales (visibles seulement en plein écran)
+    val rpm: String = "--",
+    val map: String = "--",
+    val iat: String = "--",
+    val batt: String = "--",
 ) {
     enum class Level { NORMAL, COLD, WARN, ALERT }
 
@@ -31,6 +36,10 @@ data class CardSnapshot(
         putString("alert", alert)
         putString("title", title)
         putString("subtitle", subtitle)
+        putString("rpm", rpm)
+        putString("map", map)
+        putString("iat", iat)
+        putString("batt", batt)
     }
 
     companion object {
@@ -54,6 +63,10 @@ data class CardSnapshot(
             alert = b.getString("alert"),
             title = b.getString("title") ?: "Prelude Dash",
             subtitle = b.getString("subtitle") ?: "",
+            rpm = b.getString("rpm") ?: "--",
+            map = b.getString("map") ?: "--",
+            iat = b.getString("iat") ?: "--",
+            batt = b.getString("batt") ?: "--",
         )
 
         private fun level(s: String?): Level = Level.values().firstOrNull { it.name == s } ?: Level.NORMAL

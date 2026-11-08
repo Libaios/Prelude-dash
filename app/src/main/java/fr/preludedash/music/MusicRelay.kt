@@ -123,12 +123,21 @@ object MusicRelay {
         artist = m?.getString(MediaMetadata.METADATA_KEY_ARTIST)
     }
 
-    /** Ligne à afficher sur la carte, ou null s'il n'y a pas de musique. */
+    /** Morceau en cours, découpé pour les deux lignes de la carte. */
+    data class Now(val title: String, val artistLine: String)
+
+    /** Ligne unique (écran du téléphone), ou null s'il n'y a pas de musique. */
     fun line(): String? {
+        val n = now() ?: return null
+        return "${n.title} - ${n.artistLine}"
+    }
+
+    /** Titre et artiste (avec l'état lecture/pause), ou null s'il n'y a pas de musique. */
+    fun now(): Now? {
         val t = title ?: return null
         val icon = if (playing) "▶" else "❚❚"
         val a = artist
-        return if (a.isNullOrBlank()) "$icon  $t" else "$icon  $t - $a"
+        return Now(t, if (a.isNullOrBlank()) icon else "$icon  $a")
     }
 
     fun toggle() = main.post {
