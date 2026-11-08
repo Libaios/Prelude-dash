@@ -1,11 +1,10 @@
-package fr.preludedash.card
+package fr.preludedash.shared
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
-import fr.preludedash.ui.DashRenderer
 
 /**
  * Dessine la pochette de la carte musique : très synthétique, lisible d'un coup d'oeil.
@@ -27,7 +26,7 @@ object CardRenderer {
     fun render(s: CardSnapshot, size: Int): Bitmap {
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
-        c.drawColor(DashRenderer.BG)
+        c.drawColor(Palette.BG)
         c.scale(size / V, size / V)
         draw(c, s)
         return bmp
@@ -40,23 +39,23 @@ object CardRenderer {
         // En-tête : alerte en rouge, sinon le libellé AFR
         val alert = s.alert
         if (alert != null && s.live) {
-            fill.color = DashRenderer.RED
+            fill.color = Palette.RED
             c.drawRoundRect(RectF(SAFE_L + 6f, 30f, SAFE_R - 6f, 86f), 28f, 28f, fill)
             text.typeface = condensedBold
             text.textSize = 34f
             text.letterSpacing = 0.04f
-            text.color = DashRenderer.BG
+            text.color = Palette.BG
             c.drawText(fit(text, alert, SAFE_R - SAFE_L - 40f), CX, 70f, text)
         } else {
             text.typeface = medium
             text.textSize = 24f
             text.letterSpacing = 0.16f
-            text.color = DashRenderer.MUTED
+            text.color = Palette.MUTED
             c.drawText("AFR", CX, 72f, text)
             fill.color = when {
-                s.demo -> DashRenderer.BLUE
-                s.live -> DashRenderer.GREEN
-                else -> DashRenderer.AMBER
+                s.demo -> Palette.BLUE
+                s.live -> Palette.GREEN
+                else -> Palette.AMBER
             }
             c.drawCircle(CX - 46f, 64f, 7f, fill)
         }
@@ -66,14 +65,14 @@ object CardRenderer {
         text.letterSpacing = 0f
         text.textSize = 136f
         text.color = when {
-            !s.live -> DashRenderer.MUTED
-            s.afrLevel == CardSnapshot.Level.ALERT -> DashRenderer.RED
-            else -> DashRenderer.TEXT
+            !s.live -> Palette.MUTED
+            s.afrLevel == CardSnapshot.Level.ALERT -> Palette.RED
+            else -> Palette.TEXT
         }
         c.drawText(s.afr, CX, 196f, text)
 
         // Séparateur
-        fill.color = DashRenderer.TRACK
+        fill.color = Palette.TRACK
         c.drawRect(SAFE_L + 20f, 220f, SAFE_R - 20f, 223f, fill)
 
         // Eau et éthanol
@@ -82,21 +81,21 @@ object CardRenderer {
         text.typeface = medium
         text.textSize = 20f
         text.letterSpacing = 0.14f
-        text.color = DashRenderer.MUTED
+        text.color = Palette.MUTED
         c.drawText("EAU", leftX, 256f, text)
         c.drawText("ÉTHANOL", rightX, 256f, text)
 
         text.typeface = condensedBold
         text.letterSpacing = 0f
         text.textSize = 72f
-        text.color = if (!s.live) DashRenderer.MUTED else when (s.ectLevel) {
-            CardSnapshot.Level.ALERT -> DashRenderer.RED
-            CardSnapshot.Level.WARN -> DashRenderer.AMBER
-            CardSnapshot.Level.COLD -> DashRenderer.BLUE
-            CardSnapshot.Level.NORMAL -> DashRenderer.TEXT
+        text.color = if (!s.live) Palette.MUTED else when (s.ectLevel) {
+            CardSnapshot.Level.ALERT -> Palette.RED
+            CardSnapshot.Level.WARN -> Palette.AMBER
+            CardSnapshot.Level.COLD -> Palette.BLUE
+            CardSnapshot.Level.NORMAL -> Palette.TEXT
         }
         c.drawText(s.ect + "°", leftX, 322f, text)
-        text.color = if (s.live) DashRenderer.TEXT else DashRenderer.MUTED
+        text.color = if (s.live) Palette.TEXT else Palette.MUTED
         c.drawText(s.eth + "%", rightX, 322f, text)
     }
 

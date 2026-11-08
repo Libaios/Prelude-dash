@@ -29,14 +29,14 @@ import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import fr.preludedash.card.CardRenderer
-import fr.preludedash.card.CardSnapshot
+import fr.preludedash.card.CardSnapshots
 import fr.preludedash.data.CalStore
 import fr.preludedash.data.Calibration
 import fr.preludedash.data.IsrDecoder
 import fr.preludedash.link.DataHub
 import fr.preludedash.link.LinkManager
 import fr.preludedash.music.MusicRelay
+import fr.preludedash.shared.CardRenderer
 import fr.preludedash.ui.DashRenderer
 import fr.preludedash.ui.DashView
 import java.util.Locale
@@ -214,8 +214,8 @@ class MainActivity : Activity() {
         // Carte à côté de Waze + Spotify
         col.addView(section("Carte à côté de Waze"))
         col.addView(hint(
-            "Dans Android Auto, la carte Prelude Dash prend la place de la carte musique, à côté de Waze. " +
-                "Ses boutons pilotent Spotify. Aperçu de la partie visible :",
+            "La carte s'installe à part : appli Prelude Carte (même page Releases). Dans Android Auto, " +
+                "elle prend la place de la carte musique à côté de Waze et ses boutons pilotent Spotify. Aperçu :",
         ))
         cardPreview = ImageView(this).apply { adjustViewBounds = true }
         col.addView(cardPreview, LinearLayout.LayoutParams(dp(200), dp(200)).apply {
@@ -235,7 +235,7 @@ class MainActivity : Activity() {
         col.addView(section("Android Auto"))
         col.addView(hint(
             "Plein écran : ouvre Prelude Dash depuis le lanceur Android Auto, le bouton Détails change de page. " +
-                "Carte : choisis Prelude Dash comme source musique, puis lance Waze.",
+                "Carte : ouvre Prelude Carte (source musique), puis lance Waze.",
         ))
         return scroll
     }
@@ -255,7 +255,7 @@ class MainActivity : Activity() {
         demoButton.text = if (cal.demo) "Arrêter la démo" else "Mode démo"
 
         // Aperçu de la carte et état du relais musique
-        val snap = CardSnapshot.from(DataHub.data, DataHub.state, DataHub.ageMs(), cal)
+        val snap = CardSnapshots.from(DataHub.data, DataHub.state, DataHub.ageMs(), cal)
         val bmp = CardRenderer.render(snap, 400)
         cardPreview.setImageBitmap(bmp)
         cardBitmap?.recycle()

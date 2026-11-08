@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Seules les applis signées avec la même clé (Prelude Carte) peuvent lire les données -->
+    <permission
+        android:name="fr.preludedash.permission.SHARE"
+        android:protectionLevel="signature" />
+
     <!-- Bluetooth classique (module HC-05 sur le CN2 de l'ECU) -->
     <uses-permission
         android:name="android.permission.BLUETOOTH"
@@ -50,22 +55,12 @@
             </intent-filter>
         </service>
 
-        <!-- Carte "musique" d'Android Auto, à côté de Waze. Ne joue aucun son. -->
-        <service
-            android:name=".card.CardService"
-            android:exported="true"
-            android:label="@string/card_name">
-            <intent-filter>
-                <action android:name="android.media.browse.MediaBrowserService" />
-            </intent-filter>
-        </service>
-
-        <!-- Android Auto vient chercher les images de la carte ici -->
+        <!-- Canal vers l'appli Prelude Carte (données + commandes musique) -->
         <provider
-            android:name=".card.CardArtProvider"
-            android:authorities="fr.preludedash.cardart"
+            android:name=".share.ShareProvider"
+            android:authorities="fr.preludedash.share"
             android:exported="true"
-            android:grantUriPermissions="true" />
+            android:permission="fr.preludedash.permission.SHARE" />
 
         <!-- Accès aux notifications : obligatoire pour piloter Spotify -->
         <service

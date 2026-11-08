@@ -1,28 +1,27 @@
-package fr.preludedash.card
+package fr.preludedash.carte
 
 import android.media.MediaDescription
 import android.media.MediaMetadata
 import android.media.browse.MediaBrowser
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.service.media.MediaBrowserService
-import fr.preludedash.data.CalStore
-import fr.preludedash.link.DataHub
-import fr.preludedash.link.LinkManager
-import fr.preludedash.music.MusicRelay
+import fr.preludedash.shared.CardSnapshot
+import fr.preludedash.shared.ShareContract
 
 /**
  * La carte "musique" d'Android Auto, celle qui se place à côté de Waze.
  *
- * Ce n'est pas un lecteur : la session sert de support à la carte. Elle ne joue aucun son
- * et ne prend jamais la main sur l'audio. Les boutons de la carte et du volant sont
- * relayés vers l'appli de musique en cours (Spotify) via [MusicRelay].
+ * Ce n'est pas un lecteur : la session sert de support à la carte, ne joue aucun son et ne
+ * prend jamais la main sur l'audio. Les données viennent de Prelude Dash (qui parle à l'ECU)
+ * 4 fois par seconde, et les boutons sont relayés à Spotify par Prelude Dash.
  *
- * La session reste toujours en lecture : Android Auto garde ainsi la carte de Prelude Dash
- * affichée, et le bouton visible est toujours "pause", que l'on traite comme lecture/pause.
+ * La session reste toujours en lecture : Android Auto garde ainsi la carte affichée, et le
+ * bouton visible est toujours "pause", que l'on traite comme lecture/pause de Spotify.
  */
 class CardService : MediaBrowserService() {
 
@@ -48,44 +47,28 @@ class CardService : MediaBrowserService() {
         }
     }
 
-    private val musicChanged = Runnable { handler.post { publishIfChanged(force = true) } }
-
     override fun onCreate() {
         super.onCreate()
-        session = MediaSession(this, "prelude-dash-card")
+        session = MediaSession(this, "prelude-carte")
         session.setCallback(object : MediaSession.Callback() {
             // Envoyé quand Android Auto sélectionne la carte : on ne relance rien
             override fun onPlay() = publishState()
 
             // Le bouton affiché (pause) et celui du volant : lecture/pause de Spotify
-            override fun onPause() {
-                MusicRelay.toggle()
-                publishState()
-            }
+            override fun onPause() = music(ShareContract.MUSIC_TOGGLE)
 
             override fun onStop() = publishState()
 
-            override fun onSkipToNext() {
-                MusicRelay.next()
-                publishState()
-            }
+            override fun onSkipToNext() = music(ShareContract.MUSIC_NEXT)
 
-            override fun onSkipToPrevious() {
-                MusicRelay.previous()
-                publishState()
-            }
+            override fun onSkipToPrevious() = music(ShareContract.MUSIC_PREVIOUS)
 
             override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-                if (mediaId == ITEM_RESUME) MusicRelay.play()
-                publishState()
+                if (mediaId == ITEM_RESUME) music(ShareContract.MUSIC_PLAY) else publishState()
             }
         })
         session.isActive = true
         sessionToken = session.sessionToken
-
-        LinkManager.acquire(this, "card")
-        MusicRelay.start(this)
-        MusicRelay.addListener(musicChanged)
         publishState()
         handler.post(tick)
     }
@@ -98,18 +81,29 @@ class CardService : MediaBrowserService() {
         val desc = MediaDescription.Builder()
             .setMediaId(ITEM_RESUME)
             .setTitle("Reprendre la musique")
-            .setSubtitle(MusicRelay.line() ?: "Relance l'appli de musique en cours")
+            .setSubtitle("Relance l'appli de musique en cours")
             .build()
         result.sendResult(mutableListOf(MediaBrowser.MediaItem(desc, MediaBrowser.MediaItem.FLAG_PLAYABLE)))
     }
 
-    private fun publishIfChanged(force: Boolean = false) {
-        val s = CardSnapshot.from(DataHub.data, DataHub.state, DataHub.ageMs(), CalStore.get(this))
-        if (!force && s == last) return
+    /** Demande la carte à Prelude Dash ; message d'aide si elle ne répond pas. */
+    private fun fetch(): CardSnapshot = try {
+        val b = contentResolver.call(ShareContract.URI, ShareContract.M_CARD, null, null)
+        if (b != null) CardSnapshot.fromBundle(b)
+        else CardSnapshot.offline("Prelude Dash introuvable", "Installe ou ouvre Prelude Dash")
+    } catch (_: SecurityException) {
+        CardSnapshot.offline("Accès refusé", "Réinstalle Prelude Carte après Prelude Dash")
+    } catch (_: Exception) {
+        CardSnapshot.offline("Prelude Dash introuvable", "Installe ou ouvre Prelude Dash")
+    }
+
+    private fun publishIfChanged() {
+        val s = fetch()
+        if (s == last) return
         last = s
         frameId++
         CardFrames.publish(frameId, s)
-        val art = CardArtProvider.uriFor(frameId).toString()
+        val art = Uri.parse("content://${CardArtProvider.AUTHORITY}/f/$frameId").toString()
         val meta = MediaMetadata.Builder()
             .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, "card-$frameId")
             .putString(MediaMetadata.METADATA_KEY_TITLE, s.title)
@@ -121,6 +115,16 @@ class CardService : MediaBrowserService() {
             .putString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI, art)
             .build()
         session.setMetadata(meta)
+    }
+
+    private fun music(command: String) {
+        handler.post {
+            try {
+                contentResolver.call(ShareContract.URI, ShareContract.M_MUSIC, command, null)
+            } catch (_: Exception) {
+            }
+        }
+        publishState()
     }
 
     private fun publishState() {
@@ -137,12 +141,28 @@ class CardService : MediaBrowserService() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        MusicRelay.removeListener(musicChanged)
-        LinkManager.release("card")
         session.isActive = false
         session.release()
         CardFrames.clear()
         thread.quitSafely()
         super.onDestroy()
     }
+}
+
+/** Les dernières images publiées, retrouvées par numéro quand Android Auto vient les chercher. */
+object CardFrames {
+    private const val KEEP = 32
+    private val frames = LinkedHashMap<Int, CardSnapshot>()
+
+    @Synchronized
+    fun publish(id: Int, s: CardSnapshot) {
+        frames[id] = s
+        while (frames.size > KEEP) frames.remove(frames.keys.first())
+    }
+
+    @Synchronized
+    fun get(id: Int): CardSnapshot? = frames[id]
+
+    @Synchronized
+    fun clear() = frames.clear()
 }

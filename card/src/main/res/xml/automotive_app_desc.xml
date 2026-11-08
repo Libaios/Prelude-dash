@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<automotiveApp>
+    <!-- Appli "musique" : c'est ce qui lui donne sa place à côté de Waze -->
+    <uses name="media" />
+</automotiveApp>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Droit de lire les données de Prelude Dash (même clé de signature) -->
+    <uses-permission android:name="fr.preludedash.permission.SHARE" />
+
+    <!-- Android 11+ : rendre Prelude Dash visible pour cette appli -->
+    <queries>
+        <package android:name="fr.preludedash" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name">
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- Carte "musique" d'Android Auto, à côté de Waze. Ne joue aucun son. -->
+        <service
+            android:name=".CardService"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!-- Android Auto vient chercher les images de la carte ici -->
+        <provider
+            android:name=".CardArtProvider"
+            android:authorities="fr.preludedash.carte.art"
+            android:exported="true"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>

@@ -37,16 +37,23 @@ jobs:
           done
           exit 1
 
-      - name: Renommer l'APK
-        run: cp app/build/outputs/apk/release/app-release.apk PreludeDash.apk
+      - name: Renommer les APK
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk PreludeDash.apk
+          cp card/build/outputs/apk/release/card-release.apk PreludeCarte.apk
 
-      - name: Publier l'APK (onglet Releases)
+      - name: Publier les APK (onglet Releases)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: Prelude Dash ${{ github.run_number }}
-          body: "APK prêt à installer avec UnknownAuto. Version 1.0.${{ github.run_number }}."
-          files: PreludeDash.apk
+          body: |
+            Version 1.0.${{ github.run_number }}, à installer avec UnknownAuto.
+            - PreludeDash.apk : l'appli principale (liaison ECU, plein écran, réglages)
+            - PreludeCarte.apk : la carte à côté de Waze (à installer après Prelude Dash)
+          files: |
+            PreludeDash.apk
+            PreludeCarte.apk
           make_latest: true
 
       # Résumé du build poussé sur une branche à part, pour diagnostiquer sans ouvrir GitHub

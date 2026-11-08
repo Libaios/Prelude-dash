@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "PreludeDash"
-include(":app")
+include(":app", ":card")

@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import fr.preludedash.data.Calibration
 import fr.preludedash.data.EngineData
 import fr.preludedash.link.DataHub
+import fr.preludedash.shared.Palette
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.min
@@ -47,16 +48,16 @@ class DashRenderer {
         const val VH = 480f
         const val PAGES = 2
 
-        val BG = Color.rgb(11, 13, 16)
-        val PANEL = Color.rgb(21, 26, 32)
-        val TRACK = Color.rgb(35, 42, 49)
-        val TEXT = Color.rgb(232, 236, 239)
-        val MUTED = Color.rgb(124, 135, 146)
-        val GREEN = Color.rgb(61, 220, 132)
-        val AMBER = Color.rgb(255, 176, 32)
-        val RED = Color.rgb(255, 77, 77)
-        val BLUE = Color.rgb(77, 163, 255)
-        val TEAL = Color.rgb(45, 212, 191)
+        val BG = Palette.BG
+        val PANEL = Palette.PANEL
+        val TRACK = Palette.TRACK
+        val TEXT = Palette.TEXT
+        val MUTED = Palette.MUTED
+        val GREEN = Palette.GREEN
+        val AMBER = Palette.AMBER
+        val RED = Palette.RED
+        val BLUE = Palette.BLUE
+        val TEAL = Palette.TEAL
 
         fun snapshot(page: Int, cal: Calibration) = Snapshot(
             data = DataHub.data,

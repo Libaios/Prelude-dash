@@ -49,6 +49,9 @@ android {
         jvmTarget = "17"
     }
 
+    // Code commun avec l'appli Prelude Carte
+    sourceSets["main"].java.srcDir("../shared/java")
+
     lint {
         abortOnError = false
         checkReleaseBuilds = false

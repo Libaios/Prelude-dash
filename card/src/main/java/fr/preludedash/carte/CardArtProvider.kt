@@ -1,4 +1,4 @@
-package fr.preludedash.card
+package fr.preludedash.carte
 
 import android.content.ContentProvider
 import android.content.ContentValues
@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import fr.preludedash.shared.CardRenderer
 import java.io.FileNotFoundException
 
 /**
@@ -15,10 +16,8 @@ import java.io.FileNotFoundException
 class CardArtProvider : ContentProvider() {
 
     companion object {
-        const val AUTHORITY = "fr.preludedash.cardart"
+        const val AUTHORITY = "fr.preludedash.carte.art"
         private const val SIZE = 512
-
-        fun uriFor(id: Int): Uri = Uri.parse("content://$AUTHORITY/f/$id")
     }
 
     override fun onCreate(): Boolean = true
