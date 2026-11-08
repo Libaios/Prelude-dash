@@ -150,7 +150,7 @@ object MusicRelay {
                 ?: m?.getBitmap(MediaMetadata.METADATA_KEY_ART)
                 ?: m?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
             art = try {
-                src?.let { Bitmap.createScaledBitmap(it, 128, 128, true) }
+                src?.let { Bitmap.createScaledBitmap(it, 256, 256, true) }
             } catch (_: Exception) {
                 null
             }

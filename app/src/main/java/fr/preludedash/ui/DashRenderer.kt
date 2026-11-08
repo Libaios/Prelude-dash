@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.RectF
@@ -171,7 +172,7 @@ class DashRenderer {
         }
         setLabel(17f, MUTED, 0.02f)
         // Sur la page 3D, le bandeau musique occupe le haut au centre
-        val maxW = if (s.page % PAGES == 0 && MusicRelay.title != null) vw / 2f - 150f else 470f
+        val maxW = 470f
         c.drawText(ellipsize(text, maxW), 24f, 22f, label)
 
         if (!stale) {
@@ -225,6 +226,7 @@ class DashRenderer {
             drawMusic(c, 0f, vw, 1f)
         }
         drawHeader(c, s, stale)
+        drawMusicTile(c)
         val accent = Accent.color(d.rpm, s.cal.redline, live)
         // Rupteur : cadre rouge qui clignote (la version 2D le dessine elle-même)
         if (overlay && live && d.rpm >= s.cal.redline && (SystemClock.elapsedRealtime() / 125) % 2 == 0L) {
@@ -277,12 +279,111 @@ class DashRenderer {
 
     private val curtain = SpectrumCurtain()
 
-    /** Rideau musique (voir [SpectrumCurtain]) ; rien s'il n'y a pas de morceau en cours. */
+    /** Égaliseur en rideau (voir [SpectrumCurtain]) ; rien s'il n'y a pas de morceau en cours. */
     private fun drawMusic(c: Canvas, left: Float, width: Float, unit: Float) {
+        if (MusicRelay.title == null) return
+        curtain.draw(c, left, width, unit, MusicRelay.playing, MusicRelay.progress())
+    }
+
+    private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val tilePath = Path()
+    private val tileBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
+        color = Color.argb(150, Color.red(TEAL), Color.green(TEAL), Color.blue(TEAL))
+    }
+    private val tileShade = Paint()
+    private val tileBg = Paint()
+    private val chip = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    /**
+     * Vignette du morceau en cours, à gauche sous l'en-tête : pochette en grand,
+     * titre (deux lignes au plus) et artiste posés sur un dégradé sombre en bas.
+     */
+    private fun drawMusicTile(c: Canvas) {
         val title = MusicRelay.title ?: return
-        val playing = MusicRelay.playing
-        val sub = if (playing) MusicRelay.artist else "En pause"
-        curtain.draw(c, left, width, unit, playing, MusicRelay.progress(), title, sub)
+        val x = 20f
+        val y = 40f
+        val size = 132f
+        if (tileShade.shader == null) {
+            tileShade.shader = LinearGradient(
+                0f, y + size * 0.36f, 0f, y + size,
+                0, Color.argb(220, 10, 6, 20), Shader.TileMode.CLAMP,
+            )
+            tileBg.shader = LinearGradient(
+                x, y, x + size, y + size,
+                intArrayOf(Color.rgb(255, 120, 200), Color.rgb(185, 140, 255), Color.rgb(130, 215, 255)),
+                null, Shader.TileMode.CLAMP,
+            )
+        }
+        rect.set(x, y, x + size, y + size)
+        tilePath.reset()
+        tilePath.addRoundRect(rect, 14f, 14f, Path.Direction.CW)
+        c.save()
+        c.clipPath(tilePath)
+        val art = MusicRelay.art
+        if (art != null) {
+            c.drawBitmap(art, null, rect, artPaint)
+        } else {
+            c.drawRect(rect, tileBg)
+            setLabel(44f, Color.argb(200, 255, 255, 255), 0f)
+            label.textAlign = Paint.Align.CENTER
+            c.drawText("♪", x + size / 2f, y + size * 0.42f, label)
+            label.textAlign = Paint.Align.LEFT
+        }
+        c.drawRect(x, y + size * 0.36f, x + size, y + size, tileShade)
+        c.restore()
+        c.drawRoundRect(rect, 14f, 14f, tileBorder)
+
+        // En pause : petite pastille en haut à gauche de la vignette
+        if (!MusicRelay.playing) {
+            setLabel(11f, TEXT, 0.02f)
+            val w = label.measureText("En pause") + 14f
+            rect.set(x + 8f, y + 8f, x + 8f + w, y + 26f)
+            chip.color = Color.argb(190, 10, 6, 20)
+            c.drawRoundRect(rect, 9f, 9f, chip)
+            c.drawText("En pause", x + 15f, y + 21f, label)
+        }
+
+        // Titre et artiste, du bas vers le haut
+        val inner = size - 20f
+        setLabel(12.5f, Color.rgb(214, 196, 240), 0.01f)
+        val artist = MusicRelay.artist?.takeIf { it.isNotBlank() }
+        var base = y + size - 11f
+        if (artist != null) {
+            c.drawText(fit(label, artist, inner), x + 10f, base, label)
+            base -= 19f
+        }
+        value.textSize = 16.5f
+        value.color = TEXT
+        val lines = wrap(value, title, inner, 2)
+        for (i in lines.indices.reversed()) {
+            c.drawText(lines[i], x + 10f, base, value)
+            base -= 19f
+        }
+    }
+
+    /** Coupe [text] en lignes de [maxWidth] au plus ; la dernière est raccourcie si besoin. */
+    private fun wrap(p: Paint, text: String, maxWidth: Float, maxLines: Int): List<String> {
+        val out = ArrayList<String>()
+        var line = ""
+        val words = text.split(' ').filter { it.isNotEmpty() }
+        var i = 0
+        while (i < words.size) {
+            val w = words[i]
+            val candidate = if (line.isEmpty()) w else "$line $w"
+            if (p.measureText(candidate) <= maxWidth || line.isEmpty()) {
+                line = candidate
+                i++
+            } else {
+                out.add(line)
+                line = ""
+                if (out.size == maxLines - 1) break
+            }
+        }
+        val rest = if (i < words.size) (listOf(line) + words.drop(i)).filter { it.isNotEmpty() }.joinToString(" ") else line
+        if (rest.isNotEmpty()) out.add(fit(p, rest, maxWidth))
+        return out.map { fit(p, it, maxWidth) }
     }
 
     // ---------------------------------------------------------- page principale

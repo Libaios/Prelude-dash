@@ -5,34 +5,33 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
-import android.graphics.Typeface
 import android.os.SystemClock
+import fr.preludedash.shared.Palette
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * Analyseur de spectre en rideau, sur toute la largeur du haut de l'écran : les barres en blocs
- * pendent du bord supérieur et deviennent transparentes en descendant, pour se fondre dans le décor.
- * Ambiance nightcore / lofi : rose, lavande et bleu ciel pastel, halo doux, crêtes qui retombent.
+ * Égaliseur en rideau sur toute la largeur du haut de l'écran : de fines lignes qui pendent
+ * du bord supérieur et s'effacent en descendant, pour se fondre dans le décor.
+ * Ambiance nightcore / lofi : rose, lavande et bleu ciel pastel, petites crêtes qui retombent.
  *
- * Basses sur les côtés (barres longues), aigus au centre (barres courtes) : le milieu de la scène
- * reste dégagé. La ligne lumineuse du bord supérieur sert de barre d'avancement du morceau.
+ * Basses sur les côtés (lignes longues), aigus au centre (lignes courtes) : le milieu de la
+ * scène reste dégagé. La ligne turquoise du bord supérieur montre l'avancement du morceau.
  *
  * Ce n'est pas le vrai son (Spotify ne le partage pas) : animation plausible sur un tempo lofi,
  * active seulement quand un morceau est en lecture.
  */
-class SpectrumCurtain(private val bands: Int = 56) {
+class SpectrumCurtain(private val bands: Int = 96) {
 
     private val level = FloatArray(bands)
     private val smooth = FloatArray(bands)
     private val peak = FloatArray(bands)
     private val hold = FloatArray(bands)
     private val freq = FloatArray(bands)   // 0 = basses (bords), 1 = aigus (centre)
-    private val env = FloatArray(bands)    // longueur maximale de chaque barre
+    private val env = FloatArray(bands)    // longueur maximale de chaque ligne
     private val f1 = FloatArray(bands) { 0.9f + 2.2f * hash(it * 3 + 1) }
     private val f2 = FloatArray(bands) { 2.7f + 4.6f * hash(it * 7 + 2) }
     private val p1 = FloatArray(bands) { 6.28f * hash(it * 11 + 3) }
@@ -40,26 +39,18 @@ class SpectrumCurtain(private val bands: Int = 56) {
     private var lastMs = 0L
     private var time = 0f
 
-    private val seg = Paint()
-    private val ghost = Paint()
-    private val glow = Paint()
+    private val bar = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val glow = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ceilGlow = Paint()
     private val line = Paint()
-    private val cap = Paint()
-    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
-        color = Color.rgb(255, 236, 248)
-    }
-    private val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-        color = Color.rgb(214, 196, 240)
-    }
+    private val cap = Paint(Paint.ANTI_ALIAS_FLAG)
     private var shaderLen = -1f
 
     // Palette pastel
     private val pink = Color.rgb(255, 120, 200)
     private val lavender = Color.rgb(185, 140, 255)
     private val sky = Color.rgb(130, 215, 255)
+    private val teal = Palette.TEAL
 
     init {
         for (b in 0 until bands) {
@@ -74,16 +65,7 @@ class SpectrumCurtain(private val bands: Int = 56) {
      * Dessine le rideau sur [width] pixels à partir de [left], en haut du canevas.
      * [unit] = taille d'un pixel du repère 800 x 480 (mise à l'échelle de l'écran).
      */
-    fun draw(
-        c: Canvas,
-        left: Float,
-        width: Float,
-        unit: Float,
-        playing: Boolean,
-        progress: Float?,
-        title: String,
-        sub: String?,
-    ) {
+    fun draw(c: Canvas, left: Float, width: Float, unit: Float, playing: Boolean, progress: Float?) {
         val now = SystemClock.elapsedRealtime()
         val dt = if (lastMs == 0L) 0.033f else ((now - lastMs) / 1000f).coerceIn(0f, 0.1f)
         lastMs = now
@@ -93,70 +75,47 @@ class SpectrumCurtain(private val bands: Int = 56) {
         val maxLen = 165f * unit
         shaders(maxLen, unit)
         val pitch = width / bands
-        val bw = pitch * 0.66f
-        val segH = 7f * unit
-        val step = segH + 2.2f * unit
-        val nSeg = (maxLen / step).toInt()
-        val ghostN = (nSeg * 0.5f).toInt()
-
+        val lw = 2f * unit           // ligne fine
+        val gw = 6f * unit           // halo autour
         for (b in 0 until bands) {
-            val x = left + b * pitch + (pitch - bw) / 2f
-            val lit = (smooth[b] * env[b] * nSeg).roundToInt().coerceIn(0, nSeg)
-            if (lit > 0) c.drawRect(x - 2.5f * unit, 0f, x + bw + 2.5f * unit, lit * step + 8f * unit, glow)
-            for (k in lit until ghostN) c.drawRect(x, k * step, x + bw, k * step + segH, ghost)
-            for (k in 0 until lit) c.drawRect(x, k * step, x + bw, k * step + segH, seg)
-            val pk = (peak[b] * env[b] * nSeg).toInt()
-            if (peak[b] > 0.04f && pk >= lit && pk < nSeg) {
-                cap.alpha = (230 * (1f - pk / nSeg.toFloat() * 0.6f)).toInt()
-                c.drawRect(x, pk * step, x + bw, pk * step + 2.2f * unit, cap)
+            val cx = left + (b + 0.5f) * pitch
+            val len = smooth[b] * env[b] * maxLen
+            if (len > 1f) {
+                c.drawRoundRect(cx - gw / 2f, 0f, cx + gw / 2f, len + 3f * unit, gw / 2f, gw / 2f, glow)
+                c.drawRoundRect(cx - lw / 2f, 0f, cx + lw / 2f, len, lw / 2f, lw / 2f, bar)
+            }
+            val pk = peak[b] * env[b] * maxLen
+            if (peak[b] > 0.04f && pk > len + 2f * unit) {
+                cap.alpha = (220 * (1f - pk / maxLen * 0.7f)).toInt().coerceIn(0, 255)
+                c.drawCircle(cx, pk, 1.6f * unit, cap)
             }
         }
 
-        // Bord supérieur lumineux = avancement du morceau
-        c.drawRect(left, 0f, left + width, 16f * unit, ceilGlow)
-        line.color = Color.argb(70, 255, 140, 210)
-        c.drawRect(left, 0f, left + width, 2.2f * unit, line)
+        // Bord supérieur turquoise = avancement du morceau
+        c.drawRect(left, 0f, left + width, 14f * unit, ceilGlow)
+        line.color = alpha(teal, 70)
+        c.drawRect(left, 0f, left + width, 2.4f * unit, line)
         if (progress != null) {
-            line.color = Color.argb(235, 255, 170, 225)
-            c.drawRect(left, 0f, left + width * progress, 2.2f * unit, line)
+            line.color = alpha(teal, 240)
+            c.drawRect(left, 0f, left + width * progress, 2.4f * unit, line)
         }
-
-        // Titre et artiste, en petit au centre (là où les barres sont courtes)
-        titlePaint.textSize = 15.5f * unit
-        subPaint.textSize = 13f * unit
-        titlePaint.setShadowLayer(5f * unit, 0f, 0f, Color.argb(220, 20, 6, 30))
-        subPaint.setShadowLayer(5f * unit, 0f, 0f, Color.argb(220, 20, 6, 30))
-        val maxW = width * 0.42f
-        val t = fit(titlePaint, title, maxW)
-        val s = sub?.takeIf { it.isNotBlank() }?.let { fit(subPaint, it, maxW * 0.7f) }
-        val sp = 10f * unit
-        val tw = titlePaint.measureText(t)
-        val sw = s?.let { subPaint.measureText(it) + sp } ?: 0f
-        val x0 = left + (width - tw - sw) / 2f
-        val y = 24f * unit
-        c.drawText(t, x0, y, titlePaint)
-        if (s != null) c.drawText(s, x0 + tw + sp, y, subPaint)
     }
 
     private fun shaders(len: Float, unit: Float) {
         if (len == shaderLen) return
         shaderLen = len
-        val stops = floatArrayOf(0f, 0.5f, 1f)
-        seg.shader = LinearGradient(
+        val stops = floatArrayOf(0f, 0.45f, 1f)
+        bar.shader = LinearGradient(
             0f, 0f, 0f, len,
-            intArrayOf(alpha(pink, 215), alpha(lavender, 150), alpha(sky, 60)), stops, Shader.TileMode.CLAMP,
-        )
-        ghost.shader = LinearGradient(
-            0f, 0f, 0f, len * 0.5f,
-            intArrayOf(alpha(pink, 30), alpha(lavender, 0)), null, Shader.TileMode.CLAMP,
+            intArrayOf(alpha(pink, 190), alpha(lavender, 120), alpha(sky, 20)), stops, Shader.TileMode.CLAMP,
         )
         glow.shader = LinearGradient(
             0f, 0f, 0f, len,
-            intArrayOf(alpha(pink, 60), alpha(lavender, 25), alpha(sky, 0)), stops, Shader.TileMode.CLAMP,
+            intArrayOf(alpha(pink, 45), alpha(lavender, 18), alpha(sky, 0)), stops, Shader.TileMode.CLAMP,
         )
         ceilGlow.shader = LinearGradient(
-            0f, 0f, 0f, 16f * unit,
-            intArrayOf(alpha(pink, 90), alpha(pink, 0)), null, Shader.TileMode.CLAMP,
+            0f, 0f, 0f, 14f * unit,
+            intArrayOf(alpha(teal, 80), alpha(teal, 0)), null, Shader.TileMode.CLAMP,
         )
         cap.color = Color.rgb(255, 225, 245)
     }
@@ -178,11 +137,11 @@ class SpectrumCurtain(private val bands: Int = 56) {
             val speed = if (target > level[b]) 14f else 4.5f
             level[b] += (target - level[b]) * min(1f, dt * speed)
         }
-        // Lissage entre barres voisines : un rideau souple plutôt qu'un peigne
+        // Lissage entre lignes voisines : un rideau souple plutôt qu'un peigne
         for (b in 0 until bands) {
             val l = level[max(0, b - 1)]
             val r = level[min(bands - 1, b + 1)]
-            smooth[b] = 0.15f * l + 0.7f * level[b] + 0.15f * r
+            smooth[b] = 0.2f * l + 0.6f * level[b] + 0.2f * r
             if (smooth[b] >= peak[b]) {
                 peak[b] = smooth[b]
                 hold[b] = 0.5f
@@ -192,13 +151,6 @@ class SpectrumCurtain(private val bands: Int = 56) {
                 peak[b] = max(0f, peak[b] - dt * 0.5f)
             }
         }
-    }
-
-    private fun fit(p: Paint, text: String, maxWidth: Float): String {
-        if (p.measureText(text) <= maxWidth) return text
-        var t = text
-        while (t.length > 1 && p.measureText("$t...") > maxWidth) t = t.dropLast(1)
-        return "$t..."
     }
 
     private fun alpha(c: Int, a: Int) = Color.argb(a, Color.red(c), Color.green(c), Color.blue(c))
