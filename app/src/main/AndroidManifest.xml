@@ -49,5 +49,33 @@
                 <category android:name="androidx.car.app.category.NAVIGATION" />
             </intent-filter>
         </service>
+
+        <!-- Carte "musique" d'Android Auto, à côté de Waze. Ne joue aucun son. -->
+        <service
+            android:name=".card.CardService"
+            android:exported="true"
+            android:label="@string/card_name">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!-- Android Auto vient chercher les images de la carte ici -->
+        <provider
+            android:name=".card.CardArtProvider"
+            android:authorities="fr.preludedash.cardart"
+            android:exported="true"
+            android:grantUriPermissions="true" />
+
+        <!-- Accès aux notifications : obligatoire pour piloter Spotify -->
+        <service
+            android:name=".music.MusicListenerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

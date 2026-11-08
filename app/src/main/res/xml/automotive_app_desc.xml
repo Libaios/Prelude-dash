@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <automotiveApp>
+    <!-- Plein écran : appli de navigation (Car App Library) -->
     <uses name="template" />
+    <!-- Carte à côté de Waze : appli "musique" -->
+    <uses name="media" />
 </automotiveApp>

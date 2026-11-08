@@ -5,12 +5,15 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothManager
+import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
@@ -19,17 +22,21 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import fr.preludedash.card.CardRenderer
+import fr.preludedash.card.CardSnapshot
 import fr.preludedash.data.CalStore
 import fr.preludedash.data.Calibration
 import fr.preludedash.data.IsrDecoder
 import fr.preludedash.link.DataHub
 import fr.preludedash.link.LinkManager
+import fr.preludedash.music.MusicRelay
 import fr.preludedash.ui.DashRenderer
 import fr.preludedash.ui.DashView
 import java.util.Locale
@@ -47,6 +54,10 @@ class MainActivity : Activity() {
     private lateinit var rawText: TextView
     private lateinit var candidatesBox: LinearLayout
     private lateinit var ethScaleGroup: RadioGroup
+    private lateinit var cardPreview: ImageView
+    private lateinit var cardText: TextView
+    private lateinit var musicText: TextView
+    private var cardBitmap: Bitmap? = null
     private val fields = mutableMapOf<String, EditText>()
 
     private val ui = Handler(Looper.getMainLooper())
@@ -67,6 +78,8 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         LinkManager.acquire(this, "phone")
+        MusicRelay.start(this)
+        MusicRelay.refresh()
         ui.post(refresh)
     }
 
@@ -198,10 +211,31 @@ class MainActivity : Activity() {
         rawText = text("", 13f, DashRenderer.TEXT).apply { typeface = Typeface.MONOSPACE }
         col.addView(rawText)
 
+        // Carte à côté de Waze + Spotify
+        col.addView(section("Carte à côté de Waze"))
+        col.addView(hint(
+            "Dans Android Auto, la carte Prelude Dash prend la place de la carte musique, à côté de Waze. " +
+                "Ses boutons pilotent Spotify. Aperçu de la partie visible :",
+        ))
+        cardPreview = ImageView(this).apply { adjustViewBounds = true }
+        col.addView(cardPreview, LinearLayout.LayoutParams(dp(200), dp(200)).apply {
+            topMargin = dp(8)
+            gravity = Gravity.CENTER_HORIZONTAL
+        })
+        cardText = text("", 13f, DashRenderer.TEXT)
+        col.addView(cardText, lp(top = 6))
+        musicText = text("", 14f, DashRenderer.TEXT)
+        col.addView(musicText, lp(top = 10))
+        col.addView(button("Autoriser l'accès aux notifications") { openNotificationAccess() }, lp(top = 6))
+        col.addView(hint(
+            "Indispensable pour piloter Spotify. Si l'option est grisée (« paramètre restreint ») : " +
+                "Paramètres > Applications > Prelude Dash > menu ⋮ > Autoriser les paramètres restreints, puis recommence.",
+        ))
+
         col.addView(section("Android Auto"))
         col.addView(hint(
-            "Dans la voiture, ouvre Prelude Dash depuis le lanceur Android Auto. " +
-                "Le bouton Détails en haut à droite change de page.",
+            "Plein écran : ouvre Prelude Dash depuis le lanceur Android Auto, le bouton Détails change de page. " +
+                "Carte : choisis Prelude Dash comme source musique, puis lance Waze.",
         ))
         return scroll
     }
@@ -219,6 +253,19 @@ class MainActivity : Activity() {
             else -> "${cal.deviceName ?: "Module"}  (${cal.deviceAddress})"
         }
         demoButton.text = if (cal.demo) "Arrêter la démo" else "Mode démo"
+
+        // Aperçu de la carte et état du relais musique
+        val snap = CardSnapshot.from(DataHub.data, DataHub.state, DataHub.ageMs(), cal)
+        val bmp = CardRenderer.render(snap, 400)
+        cardPreview.setImageBitmap(bmp)
+        cardBitmap?.recycle()
+        cardBitmap = bmp
+        cardText.text = "${snap.title}\n${snap.subtitle}"
+        musicText.text = when {
+            !MusicRelay.hasAccess(this) -> "Spotify : accès aux notifications pas encore donné"
+            MusicRelay.title == null -> "Spotify : accès OK, aucune musique en cours"
+            else -> "Spotify : ${MusicRelay.line()}"
+        }
 
         val raw = DataHub.data.raw
         rawText.text = if (raw.isEmpty()) {
@@ -330,6 +377,14 @@ class MainActivity : Activity() {
                 ethScaleGroup.check(1000 + scale)
                 toast("Éthanol réglé sur l'octet $index")
             }, lp(top = 4))
+        }
+    }
+
+    private fun openNotificationAccess() {
+        try {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        } catch (_: Exception) {
+            toast("Ouvre Paramètres > Notifications > Accès aux notifications")
         }
     }
 

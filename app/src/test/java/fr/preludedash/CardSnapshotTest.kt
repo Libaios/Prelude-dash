@@ -1,0 +1,84 @@
+package fr.preludedash
+
+import fr.preludedash.card.CardSnapshot
+import fr.preludedash.data.Calibration
+import fr.preludedash.data.EngineData
+import fr.preludedash.link.DataHub
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class CardSnapshotTest {
+
+    private val cal = Calibration()
+
+    private fun data(
+        afr: Float? = 14.6f,
+        ect: Float = 88f,
+        tps: Int = 10,
+        eth: Float? = 80f,
+        batt: Float = 14.1f,
+        mil: Boolean = false,
+        duty: Float = 20f,
+    ) = EngineData(
+        rpm = 2500, ectC = ect, afr = afr, tpsPct = tps, ethanolPct = eth,
+        batteryV = batt, mil = mil, dutyPct = duty,
+    )
+
+    @Test
+    fun normal_values_are_short() {
+        val s = CardSnapshot.from(data(), DataHub.State.CONNECTED, 100, cal, music = null)
+        assertTrue(s.live)
+        assertEquals("14.6", s.afr)
+        assertEquals("88", s.ect)
+        assertEquals("80", s.eth)
+        assertNull(s.alert)
+        assertEquals("AFR 14.6   88°C   E80", s.title)
+        assertEquals("ECU connecté", s.subtitle)
+    }
+
+    @Test
+    fun music_goes_in_subtitle() {
+        val s = CardSnapshot.from(data(), DataHub.State.CONNECTED, 100, cal, music = "▶  Titre - Artiste")
+        assertEquals("▶  Titre - Artiste", s.subtitle)
+    }
+
+    @Test
+    fun lean_under_load_is_the_top_alert() {
+        val s = CardSnapshot.from(data(afr = 15.8f, tps = 90, ect = 107f), DataHub.State.CONNECTED, 100, cal, music = null)
+        assertEquals("PAUVRE", s.alert)
+        assertEquals(CardSnapshot.Level.ALERT, s.afrLevel)
+        assertTrue(s.title.startsWith("⚠ PAUVRE"))
+    }
+
+    @Test
+    fun lean_at_part_throttle_is_not_an_alert() {
+        val s = CardSnapshot.from(data(afr = 15.8f, tps = 20), DataHub.State.CONNECTED, 100, cal, music = null)
+        assertNull(s.alert)
+    }
+
+    @Test
+    fun overheat_battery_mil_alerts() {
+        assertEquals("EAU 107°C", CardSnapshot.from(data(ect = 107f), DataHub.State.CONNECTED, 100, cal, null).alert)
+        assertEquals("BATT 11.6 V", CardSnapshot.from(data(batt = 11.6f), DataHub.State.CONNECTED, 100, cal, null).alert)
+        assertEquals("VOYANT MOTEUR", CardSnapshot.from(data(mil = true), DataHub.State.CONNECTED, 100, cal, null).alert)
+    }
+
+    @Test
+    fun stale_data_shows_dashes() {
+        val s = CardSnapshot.from(data(), DataHub.State.CONNECTED, 5000, cal, music = null)
+        assertFalse(s.live)
+        assertEquals("--.-", s.afr)
+        assertEquals("ECU non connecté", s.subtitle)
+    }
+
+    @Test
+    fun same_values_give_equal_snapshots() {
+        // La carte ne republie une image que si ce qui est affiché change
+        val a = CardSnapshot.from(data(afr = 14.61f), DataHub.State.CONNECTED, 100, cal, null)
+        val b = CardSnapshot.from(data(afr = 14.64f), DataHub.State.CONNECTED, 200, cal, null)
+        assertEquals(a, b)
+    }
+}

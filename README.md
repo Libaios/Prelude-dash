@@ -69,6 +69,18 @@ Lance Android Auto comme d'habitude, ouvre le lanceur d'applis et touche **Prelu
 Le bouton **Détails** en haut à droite bascule sur la deuxième page (injection, corrections,
 baro, tension sonde...).
 
+### 7. Carte à côté de Waze (v4)
+
+Prelude Dash s'affiche aussi comme une carte « musique » dans la colonne à côté de Waze :
+AFR en gros, eau et éthanol, et une alerte rouge en cas de problème (pauvre en charge, eau
+au-dessus de 105 °C, voyant moteur, batterie, injecteurs saturés). Les boutons de la carte
+et du volant pilotent Spotify, dont le titre s'affiche sous les valeurs.
+
+1. Dans l'appli sur le tel : **Autoriser l'accès aux notifications** (indispensable pour Spotify).
+   Option grisée : Paramètres > Applications > Prelude Dash > ⋮ > Autoriser les paramètres restreints.
+2. Dans la voiture : choisis Prelude Dash comme source musique dans Android Auto, puis ouvre Waze.
+3. Pour le plein écran (compte-tours, 6 valeurs, page Détails), ouvre Prelude Dash depuis le lanceur.
+
 ## Mettre à jour
 
 Télécharge le nouvel APK dans les Releases, puis UnknownAuto > Charger > Installer, comme la
