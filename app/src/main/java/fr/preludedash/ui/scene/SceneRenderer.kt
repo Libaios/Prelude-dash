@@ -249,7 +249,7 @@ class SceneRenderer {
 
     /**
      * Voiture réaliste (Filament) si disponible ; sinon le modèle simple dessiné ici.
-     * L'image Filament arrive avec les lignes de bas en haut, d'où le retournement.
+     * Filament remet lui-même l'image relue dans le bon sens (ligne du haut en premier).
      */
     private fun drawRealisticOrFallback(c: Canvas, accent: Int, rpmFrac: Float, t: Float) {
         if (Car3D.failed) {
@@ -265,10 +265,7 @@ class SceneRenderer {
             ),
         )
         val frame = Car3D.frame() ?: return
-        c.save()
-        c.scale(1f, -1f, VW / 2f, VH / 2f)
         c.drawBitmap(frame, null, dst, bitmapPaint)
-        c.restore()
     }
 
     private fun drawCar(c: Canvas, accent: Int, rpmFrac: Float, t: Float) {

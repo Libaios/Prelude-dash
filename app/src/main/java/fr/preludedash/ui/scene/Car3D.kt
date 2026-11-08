@@ -145,7 +145,7 @@ object Car3D {
         params = p
     }
 
-    /** Dernière image complète (lignes de bas en haut), ou null au démarrage. */
+    /** Dernière image complète (ligne du haut en premier), ou null au démarrage. */
     fun frame(): Bitmap? = synchronized(lock) { front }
 
     // -------------------------------------------------------------- mise en place
