@@ -169,7 +169,9 @@ class DashRenderer {
             else -> s.message
         }
         setLabel(17f, MUTED, 0.02f)
-        c.drawText(ellipsize(text, 470f), 24f, 22f, label)
+        // Sur la page 3D, le bandeau musique occupe le haut au centre
+        val maxW = if (s.page % PAGES == 0 && MusicRelay.title != null) vw / 2f - 208f else 470f
+        c.drawText(ellipsize(text, maxW), 24f, 22f, label)
 
         if (!stale) {
             var right = vw
@@ -203,11 +205,11 @@ class DashRenderer {
         val h = c.height.toFloat()
         if (shadeH != c.height) {
             shadeH = c.height
-            topShader = LinearGradient(0f, 0f, 0f, h * 0.27f, Color.argb(165, 0, 0, 0), 0, Shader.TileMode.CLAMP)
+            topShader = LinearGradient(0f, 0f, 0f, h * 0.22f, Color.argb(160, 0, 0, 0), 0, Shader.TileMode.CLAMP)
             bottomShader = LinearGradient(0f, h * 0.62f, 0f, h, 0, Color.argb(185, 0, 0, 0), Shader.TileMode.CLAMP)
         }
         shade.shader = topShader
-        c.drawRect(0f, 0f, w, h * 0.27f, shade)
+        c.drawRect(0f, 0f, w, h * 0.22f, shade)
         shade.shader = bottomShader
         c.drawRect(0f, h * 0.62f, w, h, shade)
         shade.shader = null
@@ -273,44 +275,72 @@ class DashRenderer {
     private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val clip = Path()
 
-    /** Morceau en cours (Spotify ou autre) : pochette, titre, artiste, avancement. */
+    private val meter = HifiMeter()
+    private val panel = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    /**
+     * Bandeau musique en haut au centre, façon platine hi-fi : pochette, titre, artiste,
+     * analyseur de spectre néon (animé seulement pendant la lecture) et avancement du morceau.
+     */
     private fun drawMusic(c: Canvas, accent: Int) {
         val title = MusicRelay.title ?: return
-        val x = 20f
-        val y = 38f
-        val size = 58f
-        rect.set(x, y, x + size, y + size)
+        val playing = MusicRelay.playing
+        // Centré sur la largeur réelle (le combiné grand écran est plus large que 800)
+        val l = vw / 2f - 174f
+        val t = 4f
+        val r = vw / 2f + 174f
+        val b = 50f
+        rect.set(l, t, r, b)
+        panel.style = Paint.Style.FILL
+        panel.color = Color.argb(150, 8, 6, 16)
+        c.drawRoundRect(rect, 10f, 10f, panel)
+        panel.style = Paint.Style.STROKE
+        panel.strokeWidth = 1.5f
+        panel.color = Color.argb(if (playing) 120 else 60, 255, 60, 190)
+        c.drawRoundRect(rect, 10f, 10f, panel)
+        panel.style = Paint.Style.FILL
+
+        // Pochette
+        val size = 38f
+        rect.set(l + 6f, t + 4f, l + 6f + size, t + 4f + size)
         val art = MusicRelay.art
         if (art != null) {
             clip.reset()
-            clip.addRoundRect(rect, 8f, 8f, Path.Direction.CW)
+            clip.addRoundRect(rect, 5f, 5f, Path.Direction.CW)
             c.save()
             c.clipPath(clip)
             c.drawBitmap(art, null, rect, artPaint)
             c.restore()
         } else {
             fill.color = PANEL
-            c.drawRoundRect(rect, 8f, 8f, fill)
-            setLabel(30f, accent, 0f)
+            c.drawRoundRect(rect, 5f, 5f, fill)
+            setLabel(22f, accent, 0f)
             label.textAlign = Paint.Align.CENTER
-            c.drawText("♪", x + size / 2f, y + size / 2f + 11f, label)
+            c.drawText("♪", rect.centerX(), rect.centerY() + 8f, label)
             label.textAlign = Paint.Align.LEFT
         }
-        val tx = x + size + 12f
-        value.textSize = 23f
+
+        // Titre et artiste
+        val tx = l + 6f + size + 8f
+        val tw = 146f
+        value.textSize = 17f
         value.color = TEXT
-        c.drawText(fit(value, title, 330f), tx, y + 21f, value)
-        setLabel(16f, MUTED, 0.02f)
-        val sub = listOfNotNull(if (MusicRelay.playing) null else "En pause", MusicRelay.artist?.takeIf { it.isNotBlank() })
-            .joinToString("   ")
-        if (sub.isNotEmpty()) c.drawText(fit(label, sub, 330f), tx, y + 42f, label)
+        c.drawText(fit(value, title, tw), tx, t + 20f, value)
+        setLabel(12.5f, MUTED, 0.02f)
+        val sub = if (playing) MusicRelay.artist.orEmpty() else "En pause"
+        if (sub.isNotBlank()) c.drawText(fit(label, sub, tw), tx, t + 37f, label)
+
+        // Analyseur de spectre
+        meter.draw(c, r - 140f, t + 6f, 132f, 34f, playing)
+
+        // Avancement du morceau
         val p = MusicRelay.progress() ?: return
-        rect.set(tx, y + 51f, tx + 240f, y + 54f)
+        rect.set(l + 10f, b - 4f, r - 10f, b - 2.5f)
         fill.color = TRACK
-        c.drawRoundRect(rect, 2f, 2f, fill)
-        rect.right = tx + 240f * p
+        c.drawRect(rect, fill)
+        rect.right = rect.left + (r - l - 20f) * p
         fill.color = accent
-        c.drawRoundRect(rect, 2f, 2f, fill)
+        c.drawRect(rect, fill)
     }
 
     // ---------------------------------------------------------- page principale

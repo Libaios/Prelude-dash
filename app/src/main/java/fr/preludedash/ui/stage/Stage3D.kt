@@ -331,7 +331,8 @@ class Stage3D(private val engine: Engine, ctx: Context) {
                 height = 0f
                 heightFalloff = 0.04f
                 color = floatArrayOf(0.06f, 0.025f, 0.07f)
-                maximumOpacity = 0.95f
+                // les immeubles qui arrivent au loin sortent de la brume au lieu d'apparaître d'un coup
+                maximumOpacity = 0.98f
                 // le ciel, le soleil et la silhouette de la ville restent nets
                 cutOffDistance = 350f
             }
@@ -449,8 +450,8 @@ class Stage3D(private val engine: Engine, ctx: Context) {
             // En face : 50 km/h vers nous. Devant : un peu moins vite que nous, ou 30 km/h à l'arrêt
             val rel = if (trafficOncoming[k]) -(13.9f + speed) else max(8f, speed * 0.9f + 1.5f) - speed
             var x = trafficX[k] + rel * dt
-            if (x < -40f) x = 200f + Random.nextFloat() * 90f
-            if (x > 280f) x = -35f
+            if (x < -40f) x = 300f + Random.nextFloat() * 90f
+            if (x > 400f) x = -35f
             trafficX[k] = x
             mul(translate(x, 0f, trafficZ[k]), rotY(if (trafficOncoming[k]) PI.toFloat() else 0f), tmpA)
             tm.setTransform(tm.getInstance(e), tmpA)

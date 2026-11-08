@@ -34,7 +34,8 @@ TT_H = 0.035        # hauteur du plateau (la voiture est posée dessus)
 # Route
 ROAD_Z0, ROAD_Z1 = -9.2, 4.8     # chaussée
 WALK = 3.6                        # largeur des trottoirs
-X0, X1 = -60.0, 180.0             # étendue des éléments qui défilent
+BLOCKS = [-60.0 + 120.0 * k for k in range(4)]  # pâtés de maisons de 120 m
+X0, X1 = -60.0, 420.0             # étendue des éléments qui défilent (loin, pour qu'ils apparaissent dans la brume)
 
 
 # ------------------------------------------------------------------ textures
@@ -682,7 +683,7 @@ def build_route(path):
             edge_k = int(RNG.integers(0, len(edges))) if RNG.random() < 0.5 else -1
             edge_roof = RNG.random() < 0.6
             edge_x = 0.0 if RNG.random() < 0.5 else w
-            for xo in (X0, X0 + 120):  # deux exemplaires du pâté de maisons
+            for xo in BLOCKS:  # le pâté de maisons répété jusqu'au bout de la rue
                 xa = xo + x
                 # façade côté route, étages au-dessus de 4 m ; une fenêtre = 3 m x 3,5 m
                 part = Mesh().box((xa, 4, z0), (xa + w, hgt, z1), faces=face + ('+x', '-x'))
@@ -712,7 +713,7 @@ def build_route(path):
                         edges[edge_k].box((xa, hgt - 0.22, ze0), (xa + w, hgt - 0.08, ze1))
             x += w + float(RNG.uniform(2, 6))
     # Pont au-dessus de la route
-    for xo in (X0, X0 + 120):
+    for xo in BLOCKS:
         xa = xo + 50
         conc.box((xa, 6.4, ROAD_Z0 - WALK - 4), (xa + 9, 7.5, ROAD_Z1 + WALK + 4))
         conc.box((xa, 7.5, ROAD_Z0 - WALK - 4), (xa + 0.3, 8.6, ROAD_Z1 + WALK + 4))
