@@ -4,7 +4,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.RectF
@@ -132,6 +131,8 @@ class DashRenderer {
         vw = if (spread) area.width() / scale else VW
         val ox = if (spread) area.left.toFloat() else area.left + (area.width() - VW * scale) / 2f
         val oy = area.top + (area.height() - VH * scale) / 2f
+        // Par-dessus la 3D, le rideau musique couvre tout le haut de l'écran, d'un bord à l'autre
+        if (transparent) drawMusic(canvas, 0f, canvas.width.toFloat(), scale)
         canvas.save()
         canvas.translate(ox, oy)
         canvas.scale(scale, scale)
@@ -170,7 +171,7 @@ class DashRenderer {
         }
         setLabel(17f, MUTED, 0.02f)
         // Sur la page 3D, le bandeau musique occupe le haut au centre
-        val maxW = if (s.page % PAGES == 0 && MusicRelay.title != null) vw / 2f - 208f else 470f
+        val maxW = if (s.page % PAGES == 0 && MusicRelay.title != null) vw / 2f - 150f else 470f
         c.drawText(ellipsize(text, maxW), 24f, 22f, label)
 
         if (!stale) {
@@ -219,10 +220,12 @@ class DashRenderer {
     private fun drawScenePage(c: Canvas, s: Snapshot, stale: Boolean, overlay: Boolean) {
         val d = s.data
         val live = isLive(s)
-        if (!overlay) scene.draw(c, d, live, s.cal.redline)
+        if (!overlay) {
+            scene.draw(c, d, live, s.cal.redline)
+            drawMusic(c, 0f, vw, 1f)
+        }
         drawHeader(c, s, stale)
         val accent = Accent.color(d.rpm, s.cal.redline, live)
-        drawMusic(c, if (live) accent else TEAL)
         // Rupteur : cadre rouge qui clignote (la version 2D le dessine elle-même)
         if (overlay && live && d.rpm >= s.cal.redline && (SystemClock.elapsedRealtime() / 125) % 2 == 0L) {
             stroke.strokeWidth = 10f
@@ -272,75 +275,14 @@ class DashRenderer {
         c.drawText(afrText, vw - 24f - value.measureText(afrText), 104f, value)
     }
 
-    private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val clip = Path()
+    private val curtain = SpectrumCurtain()
 
-    private val meter = HifiMeter()
-    private val panel = Paint(Paint.ANTI_ALIAS_FLAG)
-
-    /**
-     * Bandeau musique en haut au centre, façon platine hi-fi : pochette, titre, artiste,
-     * analyseur de spectre néon (animé seulement pendant la lecture) et avancement du morceau.
-     */
-    private fun drawMusic(c: Canvas, accent: Int) {
+    /** Rideau musique (voir [SpectrumCurtain]) ; rien s'il n'y a pas de morceau en cours. */
+    private fun drawMusic(c: Canvas, left: Float, width: Float, unit: Float) {
         val title = MusicRelay.title ?: return
         val playing = MusicRelay.playing
-        // Centré sur la largeur réelle (le combiné grand écran est plus large que 800)
-        val l = vw / 2f - 174f
-        val t = 4f
-        val r = vw / 2f + 174f
-        val b = 50f
-        rect.set(l, t, r, b)
-        panel.style = Paint.Style.FILL
-        panel.color = Color.argb(150, 8, 6, 16)
-        c.drawRoundRect(rect, 10f, 10f, panel)
-        panel.style = Paint.Style.STROKE
-        panel.strokeWidth = 1.5f
-        panel.color = Color.argb(if (playing) 120 else 60, 255, 60, 190)
-        c.drawRoundRect(rect, 10f, 10f, panel)
-        panel.style = Paint.Style.FILL
-
-        // Pochette
-        val size = 38f
-        rect.set(l + 6f, t + 4f, l + 6f + size, t + 4f + size)
-        val art = MusicRelay.art
-        if (art != null) {
-            clip.reset()
-            clip.addRoundRect(rect, 5f, 5f, Path.Direction.CW)
-            c.save()
-            c.clipPath(clip)
-            c.drawBitmap(art, null, rect, artPaint)
-            c.restore()
-        } else {
-            fill.color = PANEL
-            c.drawRoundRect(rect, 5f, 5f, fill)
-            setLabel(22f, accent, 0f)
-            label.textAlign = Paint.Align.CENTER
-            c.drawText("♪", rect.centerX(), rect.centerY() + 8f, label)
-            label.textAlign = Paint.Align.LEFT
-        }
-
-        // Titre et artiste
-        val tx = l + 6f + size + 8f
-        val tw = 146f
-        value.textSize = 17f
-        value.color = TEXT
-        c.drawText(fit(value, title, tw), tx, t + 20f, value)
-        setLabel(12.5f, MUTED, 0.02f)
-        val sub = if (playing) MusicRelay.artist.orEmpty() else "En pause"
-        if (sub.isNotBlank()) c.drawText(fit(label, sub, tw), tx, t + 37f, label)
-
-        // Analyseur de spectre
-        meter.draw(c, r - 140f, t + 6f, 132f, 34f, playing)
-
-        // Avancement du morceau
-        val p = MusicRelay.progress() ?: return
-        rect.set(l + 10f, b - 4f, r - 10f, b - 2.5f)
-        fill.color = TRACK
-        c.drawRect(rect, fill)
-        rect.right = rect.left + (r - l - 20f) * p
-        fill.color = accent
-        c.drawRect(rect, fill)
+        val sub = if (playing) MusicRelay.artist else "En pause"
+        curtain.draw(c, left, width, unit, playing, MusicRelay.progress(), title, sub)
     }
 
     // ---------------------------------------------------------- page principale
