@@ -59,7 +59,7 @@ class DemoSource {
             ignDeg = if (wot) 22f + rpm / 1000f else 30f,
             injMs = inj,
             dutyPct = (rpm * inj / 1200f).coerceIn(0f, 100f),
-            vssKmh = (rpm / 60).coerceAtMost(140),
+            vssKmh = if (cycle < 0.15) 0 else (rpm / 45).coerceAtMost(160),
             vtec = false,
             fan = ect > 87f,
             mil = false,

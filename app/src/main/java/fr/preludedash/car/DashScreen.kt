@@ -21,7 +21,8 @@ import fr.preludedash.ui.DashRenderer
 
 /**
  * Écran Android Auto. L'appli se déclare "navigation" : c'est la seule catégorie
- * qui a le droit de dessiner librement sur l'écran de la voiture (ici, les jauges).
+ * qui a le droit de dessiner librement sur l'écran de la voiture.
+ * Pages : la Prelude en 3D au démarrage, puis les jauges, puis les détails.
  */
 class DashScreen(carContext: CarContext) : Screen(carContext) {
 
@@ -69,6 +70,11 @@ class DashScreen(carContext: CarContext) : Screen(carContext) {
         override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
             synchronized(lock) { surface = null }
         }
+
+        // Tap sur l'écran : page suivante (Android Auto récent)
+        override fun onClick(x: Float, y: Float) {
+            nextPage()
+        }
     }
 
     init {
@@ -98,14 +104,16 @@ class DashScreen(carContext: CarContext) : Screen(carContext) {
 
     override fun onGetTemplate(): Template {
         val pageAction = Action.Builder()
-            .setTitle(if (page == 0) "Détails" else "Principal")
-            .setOnClickListener {
-                page = (page + 1) % DashRenderer.PAGES
-                invalidate()
-            }
+            .setTitle(DashRenderer.nextPageName(page))
+            .setOnClickListener { nextPage() }
             .build()
         val strip = ActionStrip.Builder().addAction(pageAction).build()
         return NavigationTemplate.Builder().setActionStrip(strip).build()
+    }
+
+    private fun nextPage() {
+        page = (page + 1) % DashRenderer.PAGES
+        invalidate()
     }
 
     private fun drawFrame() {

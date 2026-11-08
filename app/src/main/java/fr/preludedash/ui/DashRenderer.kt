@@ -10,6 +10,7 @@ import fr.preludedash.data.Calibration
 import fr.preludedash.data.EngineData
 import fr.preludedash.link.DataHub
 import fr.preludedash.shared.Palette
+import fr.preludedash.ui.scene.SceneRenderer
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.min
@@ -46,7 +47,14 @@ class DashRenderer {
     companion object {
         const val VW = 800f
         const val VH = 480f
-        const val PAGES = 2
+        const val PAGES = 3
+
+        /** Nom de la page suivante, pour le bouton. */
+        fun nextPageName(page: Int): String = when (page % PAGES) {
+            0 -> "Jauges"
+            1 -> "Détails"
+            else -> "3D"
+        }
 
         val BG = Palette.BG
         val PANEL = Palette.PANEL
@@ -98,8 +106,17 @@ class DashRenderer {
         canvas.translate(ox, oy)
         canvas.scale(scale, scale)
         val stale = s.state != DataHub.State.DEMO && s.ageMs > 1500
-        drawHeader(canvas, s, stale)
-        if (s.page % PAGES == 0) drawMain(canvas, s, stale) else drawDetails(canvas, s, stale)
+        when (s.page % PAGES) {
+            0 -> drawScenePage(canvas, s, stale)
+            1 -> {
+                drawHeader(canvas, s, stale)
+                drawMain(canvas, s, stale)
+            }
+            else -> {
+                drawHeader(canvas, s, stale)
+                drawDetails(canvas, s, stale)
+            }
+        }
         canvas.restore()
     }
 
@@ -139,6 +156,59 @@ class DashRenderer {
         c.drawRoundRect(rect, 11f, 11f, fill)
         c.drawText(text, right - w + 10f, 21f, label)
         return right - w - 8f
+    }
+
+    // --------------------------------------------------------------- page 3D
+
+    private val scene = SceneRenderer()
+
+    /** Page d'accueil : la Prelude en 3D, avec régime, vitesse et AFR par-dessus. */
+    private fun drawScenePage(c: Canvas, s: Snapshot, stale: Boolean) {
+        val d = s.data
+        val live = !stale && (s.state == DataHub.State.CONNECTED || s.state == DataHub.State.DEMO)
+        scene.draw(c, d, live, s.cal.redline)
+        drawHeader(c, s, stale)
+        val accent = scene.accentColor(d.rpm, s.cal.redline, live)
+
+        // Régime, en bas à gauche, avec une barre fine
+        value.textSize = 72f
+        value.color = if (!live) MUTED else if (d.rpm >= s.cal.redline) RED else TEXT
+        val rpmText = if (live) d.rpm.toString() else "----"
+        c.drawText(rpmText, 20f, 430f, value)
+        setLabel(15f, MUTED, 0.14f)
+        c.drawText("TR/MIN", 24f + value.measureText(rpmText), 430f, label)
+        rect.set(20f, 446f, 300f, 452f)
+        fill.color = TRACK
+        c.drawRoundRect(rect, 3f, 3f, fill)
+        if (live) {
+            rect.right = 20f + 280f * (d.rpm / (s.cal.redline + 1000f)).coerceIn(0f, 1f)
+            fill.color = accent
+            c.drawRoundRect(rect, 3f, 3f, fill)
+        }
+
+        // Vitesse, en bas à droite
+        value.textSize = 64f
+        value.color = if (live) TEXT else MUTED
+        val sp = if (live) d.vssKmh.toString() else "--"
+        val spW = value.measureText(sp)
+        setLabel(15f, MUTED, 0.14f)
+        val unitW = label.measureText("KM/H")
+        c.drawText(sp, VW - 24f - unitW - 6f - spW, 444f, value)
+        c.drawText("KM/H", VW - 24f - unitW, 444f, label)
+
+        // AFR, en haut à droite
+        val afr = d.afr
+        val lean = live && afr != null && afr > 15.0f && d.tpsPct > 60
+        setLabel(14f, MUTED, 0.14f)
+        c.drawText("AFR", VW - 24f - label.measureText("AFR"), 58f, label)
+        value.textSize = 46f
+        value.color = when {
+            !live || afr == null -> MUTED
+            lean -> RED
+            else -> TEXT
+        }
+        val afrText = if (live && afr != null) fmt1(afr) else "--.-"
+        c.drawText(afrText, VW - 24f - value.measureText(afrText), 104f, value)
     }
 
     // ---------------------------------------------------------- page principale

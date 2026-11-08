@@ -20,6 +20,12 @@ class DashView(context: Context) : View(context) {
         }
     }
 
+    init {
+        // Rendu logiciel : la scène 3D dessine des triangles colorés
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+        setOnClickListener { page = (page + 1) % DashRenderer.PAGES }
+    }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         post(tick)
