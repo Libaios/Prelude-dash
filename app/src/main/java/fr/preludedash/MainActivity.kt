@@ -6,6 +6,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -13,7 +14,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
+import android.net.Uri
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
@@ -30,6 +33,10 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import fr.preludedash.card.CardSnapshots
+import fr.preludedash.cluster.ClusterActivity
+import fr.preludedash.cluster.ClusterPrefs
+import fr.preludedash.cluster.ClusterService
+import fr.preludedash.cluster.Power
 import fr.preludedash.data.CalStore
 import fr.preludedash.data.Calibration
 import fr.preludedash.data.IsrDecoder
@@ -57,6 +64,8 @@ class MainActivity : Activity() {
     private lateinit var cardPreview: ImageView
     private lateinit var cardText: TextView
     private lateinit var musicText: TextView
+    private lateinit var clusterButton: Button
+    private lateinit var clusterText: TextView
     private var cardBitmap: Bitmap? = null
     private val fields = mutableMapOf<String, EditText>()
 
@@ -78,6 +87,7 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         LinkManager.acquire(this, "phone")
+        if (ClusterPrefs.enabled(this)) ClusterService.start(this)
         MusicRelay.start(this)
         MusicRelay.refresh()
         ui.post(refresh)
@@ -146,6 +156,26 @@ class MainActivity : Activity() {
         deviceText = text("", 15f, DashRenderer.TEXT)
         col.addView(deviceText)
         col.addView(row(button("Choisir le module") { pickDevice() }, button("Reconnecter") { LinkManager.restart(this) }))
+
+        // Combiné : 2e téléphone fixé dans la casquette
+        col.addView(section("Combiné (2e téléphone)"))
+        col.addView(hint(
+            "Uniquement sur le téléphone qui sert de combiné. Il s'allume dès que l'alim arrive (contact mis), " +
+                "se connecte à l'ECU, et se met en veille 15 s après la coupure.",
+        ))
+        clusterButton = button("") { toggleCluster() }
+        col.addView(clusterButton, lp(top = 4))
+        clusterText = text("", 15f, DashRenderer.TEXT)
+        col.addView(clusterText, lp(top = 10))
+        col.addView(row(
+            button("Affichage par-dessus") { openOverlaySettings() },
+            button("Batterie sans limite") { askBatteryExemption() },
+        ))
+        col.addView(button("Ouvrir le combiné") { startActivity(Intent(this, ClusterActivity::class.java)) }, lp(top = 8))
+        col.addView(hint(
+            "Réglages Android du téléphone combiné : verrouillage de l'écran sur « Aucun », mise en veille de " +
+                "l'écran après 15 ou 30 s. Sur le combiné, un appui change de page, un appui long revient ici.",
+        ))
 
         // Réglages
         val cal = CalStore.get(this)
@@ -260,6 +290,7 @@ class MainActivity : Activity() {
             else -> "${cal.deviceName ?: "Module"}  (${cal.deviceAddress})"
         }
         demoButton.text = if (cal.demo) "Arrêter la démo" else "Mode démo"
+        updateCluster(cal)
 
         // Aperçu de la carte et état du relais musique
         val snap = CardSnapshots.from(DataHub.data, DataHub.state, DataHub.ageMs(), cal)
@@ -288,7 +319,74 @@ class MainActivity : Activity() {
         }
     }
 
+    /** État du combiné : ce qui est prêt et ce qui reste à autoriser. */
+    private fun updateCluster(cal: Calibration) {
+        val on = ClusterPrefs.enabled(this)
+        clusterButton.text = if (on) "Désactiver le mode combiné" else "Activer le mode combiné"
+        val lines = mutableListOf(
+            check(on, "Mode combiné actif", "Mode combiné coupé"),
+            check(cal.deviceAddress != null || cal.demo, "Module Bluetooth choisi", "Module Bluetooth à choisir (ou mode démo)"),
+            check(hasBtPermission(), "Bluetooth autorisé", "Bluetooth à autoriser"),
+            check(canOverlay(), "Affichage par-dessus autorisé", "Affichage par-dessus à autoriser"),
+            check(batteryUnrestricted(), "Batterie sans limite", "Optimisation de la batterie à couper"),
+        )
+        if (Build.VERSION.SDK_INT >= 33) {
+            lines += check(
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
+                "Notifications autorisées", "Notifications à autoriser",
+            )
+        }
+        lines += if (Power.isPlugged(this)) "⚡ Alim branchée" else "🔋 Sur batterie"
+        clusterText.text = lines.joinToString("\n")
+    }
+
+    private fun check(ok: Boolean, yes: String, no: String) = if (ok) "✓  $yes" else "✗  $no"
+
+    private fun canOverlay() = Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(this)
+
+    private fun batteryUnrestricted(): Boolean =
+        getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(packageName) ?: true
+
     // --------------------------------------------------------------- actions
+
+    private fun toggleCluster() {
+        val on = !ClusterPrefs.enabled(this)
+        ClusterPrefs.setEnabled(this, on)
+        if (on) {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 2)
+            }
+            ClusterService.start(this)
+            toast("Mode combiné activé : il s'allumera au branchement de l'alim")
+        } else {
+            ClusterService.stop(this)
+            toast("Mode combiné coupé")
+        }
+        updateTexts()
+    }
+
+    private fun openOverlaySettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        } catch (_: Exception) {
+            toast("Paramètres > Applications > Prelude Dash > Afficher par-dessus les autres applis")
+        }
+    }
+
+    @SuppressLint("BatteryLife")
+    private fun askBatteryExemption() {
+        try {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Exception) {
+                toast("Paramètres > Batterie > Optimisation : Prelude Dash sur « Ne pas optimiser »")
+            }
+        }
+    }
 
     private fun toggleDemo() {
         val cal = CalStore.get(this)

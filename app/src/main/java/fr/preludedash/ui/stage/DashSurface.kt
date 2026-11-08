@@ -51,6 +51,10 @@ class DashSurface(context: Context, name: String) {
     @Volatile
     var page = 0
 
+    /** Écran plus large que la voiture (combiné) : la page 3D s'étale jusqu'aux bords. */
+    @Volatile
+    var wide = false
+
     @Volatile
     private var area: Rect? = null
 
@@ -250,7 +254,7 @@ class DashSurface(context: Context, name: String) {
             if (onScene) st.update(dt, snap.data, DashRenderer.isLive(snap), snap.cal.redline)
             val k = h.scale
             val z = Rect((zone.left * k).toInt(), (zone.top * k).toInt(), (zone.right * k).toInt(), (zone.bottom * k).toInt())
-            h.draw { c -> dash.draw(c, z, snap, overlay = onScene) }
+            h.draw { c -> dash.draw(c, z, snap, overlay = onScene, wide = wide) }
             h.setFade(if (onScene) st.fade else 0f)
             if (r.beginFrame(sc, frameTimeNanos)) {
                 if (onScene) r.render(st.view)
@@ -264,7 +268,7 @@ class DashSurface(context: Context, name: String) {
                 null
             } ?: return
             try {
-                dash.draw(canvas, zone, snap, overlay = false)
+                dash.draw(canvas, zone, snap, overlay = false, wide = wide)
             } finally {
                 s.unlockCanvasAndPost(canvas)
             }

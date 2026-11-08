@@ -81,6 +81,24 @@ Elle lit les données de Prelude Dash (qui garde seule la liaison avec l'ECU).
    Option grisée : Paramètres > Applications > Prelude Dash > ⋮ > Autoriser les paramètres restreints.
 3. Dans la voiture : ouvre **Prelude Carte** dans le lanceur (source musique), puis Waze.
 
+### 8. Mode combiné : 2e téléphone dans la casquette
+
+Un vieux téléphone (OnePlus 7) remplace le combiné d'origine : plein écran en paysage,
+Prelude en 3D, liaison ECU à lui tout seul. Pas besoin d'Android Auto ni d'UnknownAuto :
+`PreludeDash.apk` s'installe normalement (autoriser les applis inconnues).
+
+1. Paramètres Android du téléphone combiné : verrouillage de l'écran sur **Aucun**,
+   mise en veille de l'écran après **15 ou 30 s**.
+2. Dans Prelude Dash : **Choisir le module** (ou Mode démo pour un essai sans la voiture).
+3. Section **Combiné** : **Activer le mode combiné**, puis **Affichage par-dessus** et
+   **Batterie sans limite**. Toutes les lignes doivent passer au ✓.
+4. Branche l'alim : l'écran se rallume et le combiné s'ouvre. Débranche : 15 s de grâce
+   (le démarreur coupe souvent l'alim), puis veille.
+
+Sur le combiné, un appui change de page, un appui long ouvre les réglages. Un seul appareil
+peut parler au module Bluetooth : le téléphone combiné prend la liaison, Prelude Dash sur le
+téléphone principal n'aura plus de données en même temps.
+
 ## Mettre à jour
 
 Télécharge le nouvel APK dans les Releases, puis UnknownAuto > Charger > Installer, comme la

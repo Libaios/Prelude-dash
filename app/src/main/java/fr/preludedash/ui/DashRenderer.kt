@@ -107,12 +107,17 @@ class DashRenderer {
     }
     private val rect = RectF()
 
+    /** Largeur virtuelle de l'image en cours : VW, ou plus sur la page 3D d'un écran large. */
+    private var vw = VW
+
     /**
      * [area] = zone utile (hors barres d'Android Auto). Le fond est peint sur tout le canevas.
      * [overlay] : la page 3D est rendue à part (carte graphique), on ne dessine que les infos
      * par-dessus, sur fond transparent.
+     * [wide] : écran plus allongé que 800 x 480 (combiné) ; la page 3D s'étale jusqu'aux bords
+     * au lieu de rester centrée. Les pages jauges et détails restent centrées.
      */
-    fun draw(canvas: Canvas, area: Rect, s: Snapshot, overlay: Boolean = false) {
+    fun draw(canvas: Canvas, area: Rect, s: Snapshot, overlay: Boolean = false, wide: Boolean = false) {
         val transparent = overlay && s.page % PAGES == 0
         if (transparent) {
             canvas.drawColor(0, PorterDuff.Mode.CLEAR)
@@ -122,7 +127,10 @@ class DashRenderer {
         }
         if (area.width() <= 0 || area.height() <= 0) return
         val scale = min(area.width() / VW, area.height() / VH)
-        val ox = area.left + (area.width() - VW * scale) / 2f
+        // Seulement par-dessus la vraie 3D (le décor 2D de secours reste au format 800 x 480)
+        val spread = wide && transparent && area.width() > VW * scale + 1f
+        vw = if (spread) area.width() / scale else VW
+        val ox = if (spread) area.left.toFloat() else area.left + (area.width() - VW * scale) / 2f
         val oy = area.top + (area.height() - VH * scale) / 2f
         canvas.save()
         canvas.translate(ox, oy)
@@ -164,7 +172,7 @@ class DashRenderer {
         c.drawText(ellipsize(text, 470f), 24f, 22f, label)
 
         if (!stale) {
-            var right = VW
+            var right = vw
             if (s.data.mil) right = lamp(c, "MIL", right, AMBER)
             if (s.data.fan) lamp(c, "VENTILO", right, BLUE)
         }
@@ -217,7 +225,7 @@ class DashRenderer {
         if (overlay && live && d.rpm >= s.cal.redline && (SystemClock.elapsedRealtime() / 125) % 2 == 0L) {
             stroke.strokeWidth = 10f
             stroke.color = Color.argb(210, 255, 60, 60)
-            c.drawRect(5f, 5f, VW - 5f, VH - 5f, stroke)
+            c.drawRect(5f, 5f, vw - 5f, VH - 5f, stroke)
             stroke.strokeCap = Paint.Cap.ROUND
         }
 
@@ -244,14 +252,14 @@ class DashRenderer {
         val spW = value.measureText(sp)
         setLabel(15f, MUTED, 0.14f)
         val unitW = label.measureText("KM/H")
-        c.drawText(sp, VW - 24f - unitW - 6f - spW, 444f, value)
-        c.drawText("KM/H", VW - 24f - unitW, 444f, label)
+        c.drawText(sp, vw - 24f - unitW - 6f - spW, 444f, value)
+        c.drawText("KM/H", vw - 24f - unitW, 444f, label)
 
         // AFR, en haut à droite
         val afr = d.afr
         val lean = live && afr != null && afr > 15.0f && d.tpsPct > 60
         setLabel(14f, MUTED, 0.14f)
-        c.drawText("AFR", VW - 24f - label.measureText("AFR"), 58f, label)
+        c.drawText("AFR", vw - 24f - label.measureText("AFR"), 58f, label)
         value.textSize = 46f
         value.color = when {
             !live || afr == null -> MUTED
@@ -259,7 +267,7 @@ class DashRenderer {
             else -> TEXT
         }
         val afrText = if (live && afr != null) fmt1(afr) else "--.-"
-        c.drawText(afrText, VW - 24f - value.measureText(afrText), 104f, value)
+        c.drawText(afrText, vw - 24f - value.measureText(afrText), 104f, value)
     }
 
     private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
