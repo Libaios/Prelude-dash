@@ -13,7 +13,7 @@ import android.graphics.Typeface
  * - **Colonne à côté de Waze** : Android Auto agrandit l'image à toute la hauteur de la
  *   colonne et n'en garde que la bande centrale (x de 123 à 389 sur 512, mesuré sur un
  *   écran 1024x600), assombrie, avec titre et boutons sous y = 360. On y met l'essentiel :
- *   alerte, AFR, régime, MAP, eau, éthanol.
+ *   alerte, régime (en gros), AFR, MAP, eau, éthanol.
  * - **Écran musique plein écran** : l'image carrée est affichée en entier. Les deux bandes
  *   latérales, invisibles dans la colonne, ajoutent admission, avance, batterie, injecteurs.
  *
@@ -73,34 +73,30 @@ object CardRenderer {
             text.textSize = 22f
             text.letterSpacing = 0.18f
             text.color = LABEL
-            c.drawText("AFR", CX + 10f, 58f, text)
+            c.drawText("TR/MIN", CX + 12f, 58f, text)
             fill.color = when {
                 s.demo -> Palette.BLUE
                 s.live -> Palette.GREEN
                 else -> Palette.AMBER
             }
-            c.drawCircle(CX - 38f, 51f, 7f, fill)
+            c.drawCircle(CX - 60f, 51f, 7f, fill)
         }
 
-        // AFR en gros
+        // Régime en gros, orange puis rouge à l'approche de la zone rouge
         text.typeface = condensedBold
         text.letterSpacing = -0.02f
         text.textSize = 100f
-        text.color = when {
-            !s.live -> LABEL
-            s.afrLevel == CardSnapshot.Level.ALERT -> Palette.RED
-            else -> WHITE
-        }
-        c.drawText(fit(text, s.afr, BAND_R - BAND_L), CX, 150f, text)
+        text.color = levelColor(s.rpmLevel, s.live)
+        c.drawText(fit(text, s.rpm, BAND_R - BAND_L), CX, 150f, text)
 
         // Séparateur
         fill.color = Color.rgb(60, 68, 78)
         c.drawRect(BAND_L + 10f, 166f, BAND_R - 10f, 169f, fill)
 
-        // Grille 2 x 2 : régime, MAP, eau, éthanol
+        // Grille 2 x 2 : AFR, MAP, eau, éthanol
         val leftX = (BAND_L + CX) / 2f
         val rightX = (CX + BAND_R) / 2f
-        cell(c, text, leftX, 198f, "TR/MIN", s.rpm, levelColor(s.rpmLevel, s.live))
+        cell(c, text, leftX, 198f, "AFR", s.afr, levelColor(s.afrLevel, s.live))
         cell(c, text, rightX, 198f, "MAP", s.map, if (s.live) WHITE else LABEL)
         cell(c, text, leftX, 288f, "EAU", s.ect + "°", levelColor(s.ectLevel, s.live))
         cell(c, text, rightX, 288f, "E85", s.eth + "%", if (s.live) WHITE else LABEL)
