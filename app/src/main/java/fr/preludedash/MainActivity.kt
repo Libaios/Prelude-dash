@@ -131,7 +131,7 @@ class MainActivity : Activity() {
             insets
         }
 
-        col.addView(text("Prelude Dash", 26f, DashRenderer.TEXT, bold = true))
+        col.addView(text("Prelude Dash  ${appVersion()}", 26f, DashRenderer.TEXT, bold = true))
         statusText = text("", 14f, DashRenderer.MUTED)
         col.addView(statusText)
 
@@ -378,6 +378,13 @@ class MainActivity : Activity() {
                 toast("Éthanol réglé sur l'octet $index")
             }, lp(top = 4))
         }
+    }
+
+    /** "v11" pour la version 1.0.11 : permet de vérifier une mise à jour d'un coup d'oeil. */
+    private fun appVersion(): String = try {
+        "v" + (packageManager.getPackageInfo(packageName, 0).versionName ?: "?").substringAfterLast('.')
+    } catch (_: Exception) {
+        ""
     }
 
     private fun openNotificationAccess() {

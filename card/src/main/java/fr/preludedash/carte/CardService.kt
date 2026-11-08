@@ -36,6 +36,9 @@ class CardService : MediaBrowserService() {
     private val thread = HandlerThread("card").apply { start() }
     private val handler = Handler(thread.looper)
     private var frameId = 0
+
+    /** Change à chaque démarrage : Android Auto garde les images en cache par adresse. */
+    private val sessionTag = java.lang.Long.toString(System.currentTimeMillis(), 36)
     private var last: CardSnapshot? = null
 
     private val tick = object : Runnable {
@@ -117,9 +120,9 @@ class CardService : MediaBrowserService() {
         last = s
         frameId++
         CardFrames.publish(frameId, s)
-        val art = Uri.parse("content://${CardArtProvider.AUTHORITY}/f/$frameId").toString()
+        val art = Uri.parse("content://${CardArtProvider.AUTHORITY}/f/$sessionTag-$frameId").toString()
         val meta = MediaMetadata.Builder()
-            .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, "card-$frameId")
+            .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, "card-$sessionTag-$frameId")
             .putString(MediaMetadata.METADATA_KEY_TITLE, s.title)
             .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, s.title)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, s.subtitle)

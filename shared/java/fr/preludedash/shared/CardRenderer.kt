@@ -40,21 +40,32 @@ object CardRenderer {
     private val condensedBold: Typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
     private val medium: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
 
-    fun render(s: CardSnapshot, size: Int): Bitmap {
+    fun render(s: CardSnapshot, size: Int, version: String = ""): Bitmap {
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         c.scale(size / V, size / V)
-        draw(c, s)
+        draw(c, s, version)
         return bmp
     }
 
-    fun draw(c: Canvas, s: CardSnapshot) {
+    fun draw(c: Canvas, s: CardSnapshot, version: String = "") {
         c.drawColor(BLACK)
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
         val fill = Paint(Paint.ANTI_ALIAS_FLAG)
 
         drawCenter(c, s, text, fill)
         drawSides(c, s, text, fill)
+
+        // Numéro de version, discret, en haut à droite de la bande visible
+        if (version.isNotEmpty()) {
+            text.typeface = medium
+            text.textSize = 15f
+            text.letterSpacing = 0.05f
+            text.textAlign = Paint.Align.RIGHT
+            text.color = Color.rgb(110, 118, 128)
+            c.drawText(version, BAND_R - 4f, 22f, text)
+            text.textAlign = Paint.Align.CENTER
+        }
     }
 
     private fun drawCenter(c: Canvas, s: CardSnapshot, text: Paint, fill: Paint) {

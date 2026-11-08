@@ -26,6 +26,16 @@ class CardArtProvider : ContentProvider() {
         private const val SIZE = 512
     }
 
+    /** Version affichée en petit sur la carte, pour vérifier la mise à jour d'un coup d'oeil. */
+    private val version: String by lazy {
+        try {
+            val ctx = requireNotNull(context)
+            "v" + (ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?").substringAfterLast('.')
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
     override fun onCreate(): Boolean = true
 
     /**
@@ -42,9 +52,9 @@ class CardArtProvider : ContentProvider() {
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         Log.i(TAG, "image ${uri.lastPathSegment} demandée (openFile) par=$callingPackage")
-        val id = uri.lastPathSegment?.toIntOrNull()
+        val id = uri.lastPathSegment?.substringAfterLast('-')?.toIntOrNull()
         val snapshot = id?.let { CardFrames.get(it) } ?: throw FileNotFoundException("image $id inconnue")
-        val bitmap = CardRenderer.render(snapshot, SIZE)
+        val bitmap = CardRenderer.render(snapshot, SIZE, version)
         val pipe = ParcelFileDescriptor.createPipe()
         Thread({
             try {
