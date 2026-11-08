@@ -118,9 +118,13 @@ def night():
     el = np.arcsin(np.clip(y, -1, 1))
     # Ciel : zénith presque noir, horizon violet-orangé (pollution lumineuse)
     k = np.clip(el / (math.pi / 2), 0, 1)
-    sky = (np.array([0.004, 0.004, 0.012]) * k[..., None]
-           + np.array([0.05, 0.03, 0.04]) * (1 - k[..., None]) ** 3)
+    sky = (np.array([0.005, 0.003, 0.014]) * k[..., None]
+           + np.array([0.06, 0.02, 0.07]) * (1 - k[..., None]) ** 3)
     out[:] = sky
+    # Couchant rose/orange vers +x (le soleil rétro au bout de la route)
+    toward = np.arccos(np.clip(x / np.maximum(np.sqrt(x * x + z * z), 1e-6), -1, 1))
+    glow = np.exp(-(toward / 0.7) ** 2) * np.exp(-(np.maximum(el, 0) / 0.22) ** 2) * (y > -0.02)
+    out += glow[..., None] * np.array([0.9, 0.25, 0.35])
     out[y < 0] = (0.006, 0.006, 0.007)
     # Immeubles des deux côtés : bande sombre avec fenêtres éclairées
     rng = np.random.default_rng(3)

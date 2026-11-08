@@ -2,12 +2,14 @@ package fr.preludedash.music
 
 import android.content.ComponentName
 import android.content.Context
+import android.graphics.Bitmap
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import java.util.concurrent.CopyOnWriteArraySet
 
@@ -37,6 +39,23 @@ object MusicRelay {
     var playing: Boolean = false
         private set
 
+    /** Pochette réduite (pour le plein écran), si l'appli de musique la fournit. */
+    @Volatile
+    var art: Bitmap? = null
+        private set
+
+    @Volatile
+    private var durationMs = 0L
+
+    @Volatile
+    private var positionMs = 0L
+
+    @Volatile
+    private var positionAt = 0L
+
+    @Volatile
+    private var positionSpeed = 1f
+
     private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { list ->
         pick(list ?: emptyList())
     }
@@ -48,7 +67,7 @@ object MusicRelay {
         }
 
         override fun onPlaybackStateChanged(state: PlaybackState?) {
-            playing = state?.state == PlaybackState.STATE_PLAYING
+            readState(state)
             fire()
         }
 
@@ -109,18 +128,51 @@ object MusicRelay {
         if (chosen != null) {
             chosen.registerCallback(controllerCallback, main)
             readMeta(chosen.metadata)
-            playing = chosen.playbackState?.state == PlaybackState.STATE_PLAYING
+            readState(chosen.playbackState)
         } else {
             title = null
             artist = null
+            art = null
+            durationMs = 0L
             playing = false
         }
         fire()
     }
 
     private fun readMeta(m: MediaMetadata?) {
-        title = m?.getString(MediaMetadata.METADATA_KEY_TITLE)
+        val newTitle = m?.getString(MediaMetadata.METADATA_KEY_TITLE)
+        val trackChanged = newTitle != title || art == null
+        title = newTitle
         artist = m?.getString(MediaMetadata.METADATA_KEY_ARTIST)
+        durationMs = m?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+        if (trackChanged) {
+            val src = m?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: m?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+                ?: m?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+            art = try {
+                src?.let { Bitmap.createScaledBitmap(it, 128, 128, true) }
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    private fun readState(st: PlaybackState?) {
+        playing = st?.state == PlaybackState.STATE_PLAYING
+        if (st != null) {
+            positionMs = st.position
+            positionAt = st.lastPositionUpdateTime
+            positionSpeed = st.playbackSpeed
+        }
+    }
+
+    /** Avancement dans le morceau (0 à 1), ou null si l'appli de musique ne le donne pas. */
+    fun progress(): Float? {
+        val d = durationMs
+        if (d <= 0L || title == null) return null
+        var pos = positionMs
+        if (playing && positionAt > 0L) pos += ((SystemClock.elapsedRealtime() - positionAt) * positionSpeed).toLong()
+        return (pos.toFloat() / d).coerceIn(0f, 1f)
     }
 
     /** Morceau en cours, découpé pour les deux lignes de la carte. */

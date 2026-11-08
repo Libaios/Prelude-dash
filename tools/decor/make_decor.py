@@ -202,17 +202,20 @@ def tex_facade(kind):
 
 
 def tex_shop():
-    """Vitrine de 4 m : vitres sombres, intérieur éclairé, montants."""
+    """Vitrine de 4 m : intérieur éclairé par le haut, étagères garnies, montants."""
     w, h = 256, 160
     v = np.linspace(0, 1, h)[:, None]
-    inside = (0.55 + 0.45 * (1 - v)) * np.ones((1, w))
-    a = np.stack([inside * 210, inside * 170, inside * 120], -1)
-    # rayonnages et silhouettes
-    for _ in range(14):
-        x0 = int(RNG.integers(0, w - 20))
-        y0 = int(RNG.integers(int(h * 0.35), h - 10))
-        a[y0:, x0:x0 + int(RNG.integers(8, 30))] *= RNG.uniform(0.25, 0.6)
-    a[:, :] *= (0.92 + 0.08 * pnoise(h, w, 8))[..., None]
+    inside = (0.25 + 0.75 * (1 - v) ** 1.5) * np.ones((1, w))
+    a = np.stack([inside * 200, inside * 160, inside * 125], -1)
+    for y in (int(h * 0.45), int(h * 0.68), int(h * 0.9)):
+        a[y:y + 3, :] = (40, 34, 30)
+        x = 6
+        while x < w - 10:
+            bw = int(RNG.integers(4, 12))
+            bh = int(RNG.integers(5, 14))
+            col = np.array([(170, 60, 60), (60, 120, 170), (190, 160, 70), (90, 150, 90), (200, 200, 200)][int(RNG.integers(0, 5))])
+            a[y - bh:y, x:x + bw] = col * (0.5 + 0.5 * (1 - y / h))
+            x += bw + int(RNG.integers(1, 6))
     for x in (0, w // 2, w - 1):
         a[:, max(0, x - 3):x + 3] = (18, 18, 20)
     a[:6, :] = (18, 18, 20)
@@ -228,14 +231,14 @@ def tex_skyline():
         bw = int(RNG.integers(24, 90))
         bh = int(h * RNG.uniform(0.18, 0.92) ** 1.5)
         shade = RNG.uniform(14, 24)
-        a[h - bh:, x:x + bw, :3] = (shade * 0.9, shade, shade * 1.35)
+        a[h - bh:, x:x + bw, :3] = (shade * 1.1, shade * 0.55, shade * 1.6)
         a[h - bh:, x:x + bw, 3] = 255
         # fenêtres allumées
         for _ in range(int(bw * bh / 90)):
             px = x + int(RNG.integers(2, max(3, bw - 2)))
             py = h - int(RNG.integers(2, max(3, bh - 2)))
             if RNG.random() < 0.5:
-                a[py:py + 2, px:px + 2, :3] = (230, 170, 100) if RNG.random() < 0.7 else (170, 200, 255)
+                a[py:py + 2, px:px + 2, :3] = [(230, 170, 100), (255, 90, 190), (90, 220, 255)][int(RNG.integers(0, 3))]
         if RNG.random() < 0.15 and bh > h * 0.5:  # antenne
             ax = x + bw // 2
             a[h - bh - 18:h - bh, ax:ax + 2, :3] = shade
@@ -246,17 +249,143 @@ def tex_skyline():
 
 
 def tex_sky():
-    w, h = 1024, 256
-    v = np.linspace(0, 1, h)[:, None]  # 0 = zénith, 1 = horizon
-    top = np.array([3, 4, 10])
-    mid = np.array([14, 14, 32])
-    hor = np.array([60, 40, 52])
-    c = np.where(v < 0.7, top + (mid - top) * (v / 0.7), mid + (hor - mid) * ((v - 0.7) / 0.3))
-    a = np.repeat(c[:, None, :] if c.ndim == 2 else c, w, axis=1).reshape(h, w, 3).astype(float)
+    """Ciel « retrowave » : u = azimut (0 = vers +x, le soleil), v = 0 au zénith, 1 à l'horizon."""
+    w, h = 2048, 512
+    v = np.linspace(0, 1, h)[:, None]
+    u = np.linspace(0, 1, w)[None, :]
+    daz = np.minimum(u, 1 - u) * 2 * math.pi           # écart angulaire avec le soleil
+    top = np.array([7, 4, 20.0])
+    hor = np.array([52, 16, 66.0])
+    base = top + (hor - top) * (v ** 1.6)[..., None]
+    g = np.exp(-(daz / 0.75) ** 2)[..., None] * (v ** 2.5)[..., None]
+    warm = np.array([255, 92, 128.0]) * (1 - v[..., None] ** 8 * 0.0) 
+    glow = np.where(v[..., None] > 0.85, np.array([255, 140, 90.0]), warm)
+    a = base + (glow - base) * np.clip(g * 1.15, 0, 1)
+    a = a * np.ones((1, w, 1))
     stars = RNG.random((h, w))
-    mask = (stars > 0.9975) & (v < 0.75)
-    a[mask] = 140 + 115 * RNG.random((mask.sum(), 1))
+    mask = (stars > 0.9985) & (v < 0.6) & (np.exp(-(daz / 0.6) ** 2) < 0.4)
+    a[mask] = 150 + 105 * RNG.random((int(mask.sum()), 1))
     return img(a)
+
+
+def tex_sun():
+    """Soleil rétro : dégradé jaune -> rose, bandes horizontales dans le bas."""
+    n = 512
+    y, x = np.mgrid[0:n, 0:n] / (n - 1)
+    r = np.hypot(x - 0.5, y - 0.5)
+    alpha = np.clip((0.5 - r) * n / 2, 0, 1)
+    # bandes : de plus en plus épaisses vers le bas
+    yy = y - 0.45
+    for k in range(9):
+        y0 = 0.45 + 0.055 * k + 0.004 * k * k
+        th = 0.008 + 0.0045 * k
+        alpha = np.where((y >= y0) & (y < y0 + th), 0, alpha)
+    top = np.array([255, 214, 40.0])
+    mid = np.array([255, 96, 70.0])
+    bot = np.array([235, 20, 150.0])
+    t = y[..., None]
+    c = np.where(t < 0.5, top + (mid - top) * (t / 0.5), mid + (bot - mid) * ((t - 0.5) / 0.5))
+    out = np.zeros((n, n, 4))
+    out[..., :3] = c
+    out[..., 3] = alpha * 255
+    return Image.fromarray(out.astype(np.uint8), 'RGBA')
+
+
+def tex_halo():
+    n = 256
+    y, x = np.mgrid[0:n, 0:n] / (n - 1) * 2 - 1
+    r = np.hypot(x, y)
+    out = np.zeros((n, n, 4))
+    out[..., :3] = (255, 70, 150)
+    out[..., 3] = np.clip(1 - r, 0, 1) ** 2.2 * 150
+    return Image.fromarray(out.astype(np.uint8), 'RGBA')
+
+
+def tex_leaf():
+    """Palme : nervure centrale et folioles en biais (alpha = découpe)."""
+    w, h = 256, 64
+    im = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    c = h // 2
+    for x in range(4, w - 6, 5):
+        k = 1 - x / w
+        half = int((h // 2 - 2) * (0.35 + 0.65 * math.sin(math.pi * min(1, x / w * 1.15)))) 
+        col = (34, 70 + int(20 * k), 30, 255)
+        d.line([(x, c), (x + 14, c - half)], fill=col, width=2)
+        d.line([(x, c), (x + 14, c + half)], fill=col, width=2)
+    d.line([(0, c), (w - 1, c)], fill=(60, 52, 30, 255), width=3)
+    return im
+
+
+# ------------------------------------------------------------ objets route
+
+def ring_tube(m, pts, radii, sides=6):
+    """Tube le long d'une suite de points (tronc), sections circulaires horizontales."""
+    P, N, T, I = [], [], [], []
+    for j, (p, r) in enumerate(zip(pts, radii)):
+        for i in range(sides + 1):
+            a = 2 * math.pi * i / sides
+            n = (math.cos(a), 0.0, math.sin(a))
+            P.append((p[0] + r * n[0], p[1], p[2] + r * n[2]))
+            N.append(n)
+            T.append((i / sides, j / (len(pts) - 1)))
+    for j in range(len(pts) - 1):
+        for i in range(sides):
+            a = j * (sides + 1) + i
+            b = a + sides + 1
+            I += [a, b, a + 1, a + 1, b, b + 1]
+    m.add(P, N, T, I)
+
+
+def palm(trunks, leaves, x, y0, z, lean):
+    """Palmier de 8,5 m, légèrement penché vers la route, couronne de 9 palmes."""
+    H = 8.4 + float(RNG.uniform(-0.8, 0.8))
+    bend = 1.1 * lean
+    pts, radii = [], []
+    for j in range(11):
+        t = j / 10
+        pts.append((x + 0.3 * t * t, y0 + H * t, z + bend * t * t))
+        radii.append(0.21 - 0.08 * t)
+    ring_tube(trunks, pts, radii)
+    top = np.array(pts[-1])
+    for k in range(9):
+        th = 2 * math.pi * k / 9 + float(RNG.uniform(-0.2, 0.2))
+        d = np.array([math.cos(th), 0.0, math.sin(th)])
+        side = np.array([-d[2], 0.0, d[0]])
+        L = float(RNG.uniform(2.8, 3.6))
+        rise = float(RNG.uniform(0.3, 0.8))
+        P, N, T, I = [], [], [], []
+        segs = 5
+        for j in range(segs + 1):
+            s = j / segs
+            c = top + d * L * s + np.array([0, rise * s - 1.9 * s * s, 0])
+            hw = 0.45 * math.sin(math.pi * min(1.0, 0.15 + s * 0.9)) + 0.05
+            for sgn, v in ((-1, 0.0), (1, 1.0)):
+                q = c + side * hw * sgn - np.array([0, 0.08 * hw, 0])
+                P.append(q)
+                N.append((0, 1, 0))
+                T.append((s, v))
+        for j in range(segs):
+            a = 2 * j
+            I += [a, a + 2, a + 1, a + 1, a + 2, a + 3]
+        leaves.add(P, N, T, I)
+
+
+def traffic_car():
+    """Berline générique (de nuit on voit surtout ses feux), avant vers +x."""
+    body, glass, tires, head, tail = Mesh(), Mesh(), Mesh(), Mesh(), Mesh()
+    body.box((-2.2, 0.28, -0.86), (2.2, 0.92, 0.86))
+    body.box((-1.3, 0.92, -0.78), (0.9, 0.96, 0.78), faces=('+y',))
+    glass.box((-1.25, 0.92, -0.74), (0.85, 1.36, 0.74), faces=('+x', '-x', '+z', '-z', '+y'))
+    for wx in (-1.35, 1.35):
+        for wz in (-0.8, 0.8):
+            part = Mesh().cylinder((0, -0.11, 0), 0.31, 0.22, seg=12, top=True, bottom=True)
+            tires.merge(part, translate(wx, 0.31, wz) @ np.array(
+                [[1, 0, 0, 0], [0, 0, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]], np.float64))
+    for z in (-0.62, 0.62):
+        head.box((2.2, 0.62, z - 0.2), (2.22, 0.74, z + 0.2), faces=('+x',))
+        tail.box((-2.22, 0.66, z - 0.22), (-2.2, 0.8, z + 0.22), faces=('-x',))
+    return body, glass, tires, head, tail
 
 
 # ---------------------------------------------------------------- garage
@@ -457,6 +586,9 @@ def build_route(path):
     t_skyline = g.texture(tex_skyline(), fmt='PNG')
     t_shadow = g.texture(tex_shadow(), fmt='PNG', clamp=True)
     t_shop = g.texture(tex_shop())
+    t_sun = g.texture(tex_sun(), fmt='PNG', clamp=True)
+    t_halo = g.texture(tex_halo(), fmt='PNG', clamp=True)
+    t_leaf = g.texture(tex_leaf(), fmt='PNG', clamp=True)
 
     m_road = g.material('road', color=(1, 1, 1, 0.9), rough=1, tex=t_road, mr=t_road_mr, blend='BLEND')
     m_walk = g.material('sidewalk', color=(1, 1, 1, 1), rough=0.85, tex=t_walk)
@@ -466,7 +598,7 @@ def build_route(path):
     m_fac = [g.material('facade_%d' % k, color=(1, 1, 1, 1), rough=0.75, metal=0.1 if k != 1 else 0.5,
                         tex=a, emis=(1, 1, 1), etex=e, strength=1.3) for k, (a, e) in enumerate(t_fac)]
     m_roof = g.material('roof', color=(0.03, 0.03, 0.035, 1), rough=0.9)
-    m_shop = g.material('shop_window', color=(0.03, 0.03, 0.03, 1), rough=0.15, emis=(1, 1, 1), etex=t_shop, strength=1.1)
+    m_shop = g.material('shop_window', color=(0.03, 0.03, 0.03, 1), rough=0.15, emis=(1, 1, 1), etex=t_shop, strength=0.8)
     m_neons = [g.material('shop_neon_%d' % k, color=(0, 0, 0, 1), rough=0.5, emis=c, strength=2.6) for k, c in
                enumerate([(1.0, 0.15, 0.55), (0.15, 0.85, 1.0), (1.0, 0.6, 0.1), (0.4, 1.0, 0.3)])]
     m_concrete = g.material('concrete', color=(0.07, 0.07, 0.075, 1), rough=0.85)
@@ -475,6 +607,18 @@ def build_route(path):
     m_sky = g.material('sky', color=(1, 1, 1, 1), tex=t_sky, unlit=True)
     m_skyline = g.material('skyline', color=(1, 1, 1, 1), tex=t_skyline, unlit=True, blend='MASK', cutoff=0.5)
     m_shadow = g.material('blob_shadow', color=(0, 0, 0, 1), tex=t_shadow, unlit=True, blend='BLEND')
+    m_sun = g.material('sun', color=(0, 0, 0, 1), tex=t_sun, emis=(1, 1, 1), etex=t_sun, strength=0.95,
+                       blend='MASK', cutoff=0.5, rough=1)
+    m_halo = g.material('sun_halo', color=(1, 1, 1, 1), tex=t_halo, unlit=True, blend='BLEND')
+    m_trunk = g.material('palm_trunk', color=(0.07, 0.045, 0.03, 1), rough=0.9)
+    m_leaf = g.material('palm_leaf', color=(1, 1, 1, 1), tex=t_leaf, rough=0.7, blend='MASK', cutoff=0.4, double=True)
+    m_edge = [g.material('edge_neon_%d' % k, color=(0, 0, 0, 1), rough=0.5, emis=c, strength=3.2) for k, c in
+              enumerate([(1.0, 0.18, 0.62), (0.2, 0.9, 1.0)])]
+    m_tbody = g.material('traffic_body', color=(0.025, 0.025, 0.03, 1), metal=0.6, rough=0.28)
+    m_tglass = g.material('traffic_glass', color=(0.01, 0.01, 0.012, 1), rough=0.05)
+    m_thead = g.material('traffic_head', color=(1, 1, 1, 1), emis=(1, 0.96, 0.88), strength=9)
+    m_ttail = g.material('traffic_tail', color=(0.3, 0, 0, 1), emis=(1, 0.04, 0.04), strength=3.5)
+    m_trubber = g.material('traffic_tire', color=(0.015, 0.015, 0.017, 1), rough=0.9)
 
     L = X1 - X0
     # --- défile tous les 12 m : chaussée, trottoirs, bordures
@@ -500,12 +644,20 @@ def build_route(path):
             heads.box((x - 0.35, 7.74, za - 0.18), (x + 0.35, 7.86, za + 0.18))
             poles.box((x - 0.37, 7.86, za - 0.2), (x + 0.37, 7.95, za + 0.2), faces=('+y', '+x', '-x', '+z', '-z'))
             x += 30.0
-    g.node('scroll_30', children=[g.mesh_node('lamps', [(poles, m_pole), (heads, m_lamp)])], root=True)
+    trunks, leaves = Mesh(), Mesh()
+    for zp, lean, xo in ((ROAD_Z1 + 1.9, -1.0, 15.0), (ROAD_Z0 - 1.8, 1.0, 0.0)):
+        x = X0 + xo
+        while x < X1:
+            palm(trunks, leaves, x, hcurb, zp, lean)
+            x += 30.0
+    g.node('scroll_30', children=[g.mesh_node('lamps', [(poles, m_pole), (heads, m_lamp), (trunks, m_trunk),
+                                                         (leaves, m_leaf)])], root=True)
 
     # --- défile tous les 120 m : immeubles, vitrines, néons, pont
     fac = [Mesh() for _ in m_fac]
     roof, shop, conc, under = Mesh(), Mesh(), Mesh(), Mesh()
     neons = [Mesh() for _ in m_neons]
+    edges = [Mesh() for _ in m_edge]
     zr = ROAD_Z1 + WALK + 0.2
     zl = ROAD_Z0 - WALK - 0.2
     for side in (1, -1):
@@ -527,6 +679,9 @@ def build_route(path):
             nl = min(w - 2, float(RNG.uniform(3, 8)))
             nxo = float(RNG.uniform(1, max(1.1, w - nl - 1)))
             face = ('-z',) if side > 0 else ('+z',)
+            edge_k = int(RNG.integers(0, len(edges))) if RNG.random() < 0.5 else -1
+            edge_roof = RNG.random() < 0.6
+            edge_x = 0.0 if RNG.random() < 0.5 else w
             for xo in (X0, X0 + 120):  # deux exemplaires du pâté de maisons
                 xa = xo + x
                 # façade côté route, étages au-dessus de 4 m ; une fenêtre = 3 m x 3,5 m
@@ -549,6 +704,12 @@ def build_route(path):
                     za, zb = sorted((zf - side * 0.06, zf - side * 0.12))
                     neons[nk].box((xa + nxo, 3.25, za), (xa + nxo + nl, 3.6, zb),
                                   faces=face + ('+y', '-y', '+x', '-x'))
+                if edge_k >= 0:
+                    ze0, ze1 = sorted((zf - side * 0.02, zf - side * 0.14))
+                    ex = xa + edge_x
+                    edges[edge_k].box((ex - 0.07, 4.2, ze0), (ex + 0.07, hgt - 0.2, ze1))
+                    if edge_roof:
+                        edges[edge_k].box((xa, hgt - 0.22, ze0), (xa + w, hgt - 0.08, ze1))
             x += w + float(RNG.uniform(2, 6))
     # Pont au-dessus de la route
     for xo in (X0, X0 + 120):
@@ -562,6 +723,7 @@ def build_route(path):
             under.box((xx - 0.08, 6.36, ROAD_Z0 + 0.5), (xx + 0.08, 6.4, ROAD_Z1 - 0.5), faces=('-y', '+x', '-x'))
     city = [(f, m) for f, m in zip(fac, m_fac)] + [(roof, m_roof), (shop, m_shop), (conc, m_concrete), (under, m_under)]
     city += [(n, m) for n, m in zip(neons, m_neons)]
+    city += [(e, m) for e, m in zip(edges, m_edge)]
     g.node('scroll_120', children=[g.mesh_node('city', city)], root=True)
 
     # --- fixe : sol lointain, silhouette de la ville, ciel
@@ -578,7 +740,7 @@ def build_route(path):
             d = (math.cos(el) * math.cos(az), math.sin(el), math.cos(el) * math.sin(az))
             P.append((Rd * d[0], Rd * d[1] - 10, Rd * d[2]))
             N.append((-d[0], -d[1], -d[2]))
-            T.append((i / seg * 4, 1 - r / rings))
+            T.append((i / seg, 1 - r / rings))
     for r in range(rings):
         for i in range(seg):
             a = r * (seg + 1) + i
@@ -586,9 +748,19 @@ def build_route(path):
             I += [a, b, a + 1, a + 1, b, b + 1]
     dome.add(P, N, T, I)
     shadow = Mesh().quad((-2.75, 0.01, 1.25), (5.5, 0, 0), (0, 0, -2.5))
+    # Soleil couchant au bout de la route, derrière la silhouette de la ville
+    sun = Mesh().quad((505, -14, -52), (0, 0, 104), (0, 104, 0))
+    halo = Mesh().quad((512, -110, -150), (0, 0, 300), (0, 300, 0))
     g.node('route_static', children=[
         g.mesh_node('far', [(ground, m_ground), (skyline, m_skyline), (dome, m_sky)]),
+        g.mesh_node('sun', [(sun, m_sun), (halo, m_halo)]),
     ], root=True)
+    # Voitures de la circulation (déplacées par l'appli)
+    tcar = traffic_car()
+    mesh = g.mesh('traffic_car', [(tcar[0], m_tbody), (tcar[1], m_tglass), (tcar[2], m_trubber),
+                                  (tcar[3], m_thead), (tcar[4], m_ttail)])
+    for k in range(4):
+        g.node('traffic_%d' % k, mesh=mesh, t=(-500, 0, 0), root=True)
     g.node('route_shadow', children=[g.mesh_node('blob_shadow', [(shadow, m_shadow)])], root=True)
     return g.save(path)
 

@@ -8,11 +8,15 @@ import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.lifecycle.Lifecycle
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.LifecycleEventObserver
+import fr.preludedash.R
 import fr.preludedash.link.LinkManager
+import fr.preludedash.music.MusicRelay
 import fr.preludedash.ui.DashRenderer
 import fr.preludedash.ui.stage.DashSurface
 
@@ -30,6 +34,15 @@ class DashScreen(carContext: CarContext) : Screen(carContext) {
 
     @Volatile
     private var page = 0
+
+    // Boutons musique : on ne redemande l'affichage que si l'état change vraiment
+    private var shownPlaying = false
+    private var shownMusic = false
+    private val musicListener = Runnable {
+        val playing = MusicRelay.playing
+        val has = MusicRelay.title != null
+        if (playing != shownPlaying || has != shownMusic) invalidate()
+    }
 
     private val surfaceCallback = object : SurfaceCallback {
         override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
@@ -63,10 +76,13 @@ class DashScreen(carContext: CarContext) : Screen(carContext) {
                 Lifecycle.Event.ON_CREATE -> {
                     carContext.getCarService(AppManager::class.java).setSurfaceCallback(surfaceCallback)
                     LinkManager.acquire(carContext, "car")
+                    MusicRelay.start(carContext)
+                    MusicRelay.addListener(musicListener)
                 }
                 Lifecycle.Event.ON_START -> dash.start()
                 Lifecycle.Event.ON_STOP -> dash.stop()
                 Lifecycle.Event.ON_DESTROY -> {
+                    MusicRelay.removeListener(musicListener)
                     LinkManager.release("car")
                     dash.release()
                 }
@@ -80,8 +96,24 @@ class DashScreen(carContext: CarContext) : Screen(carContext) {
             .setTitle(DashRenderer.nextPageName(page))
             .setOnClickListener { nextPage() }
             .build()
-        val strip = ActionStrip.Builder().addAction(pageAction).build()
-        return NavigationTemplate.Builder().setActionStrip(strip).build()
+        val strip = ActionStrip.Builder()
+        // Musique (Spotify ou autre) : précédent, lecture/pause, suivant
+        shownPlaying = MusicRelay.playing
+        shownMusic = MusicRelay.title != null
+        if (shownMusic) {
+            strip.addAction(iconAction(R.drawable.ic_music_prev) { MusicRelay.previous() })
+            strip.addAction(iconAction(if (shownPlaying) R.drawable.ic_music_pause else R.drawable.ic_music_play) {
+                MusicRelay.toggle()
+            })
+            strip.addAction(iconAction(R.drawable.ic_music_next) { MusicRelay.next() })
+        }
+        strip.addAction(pageAction)
+        return NavigationTemplate.Builder().setActionStrip(strip.build()).build()
+    }
+
+    private fun iconAction(icon: Int, onClick: () -> Unit): Action {
+        val carIcon = CarIcon.Builder(IconCompat.createWithResource(carContext, icon)).build()
+        return Action.Builder().setIcon(carIcon).setOnClickListener { onClick() }.build()
     }
 
     private fun nextPage() {

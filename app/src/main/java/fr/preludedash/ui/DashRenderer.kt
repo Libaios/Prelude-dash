@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.RectF
@@ -13,6 +14,7 @@ import android.os.SystemClock
 import fr.preludedash.data.Calibration
 import fr.preludedash.data.EngineData
 import fr.preludedash.link.DataHub
+import fr.preludedash.music.MusicRelay
 import fr.preludedash.shared.Palette
 import fr.preludedash.ui.scene.SceneRenderer
 import java.util.Locale
@@ -193,11 +195,11 @@ class DashRenderer {
         val h = c.height.toFloat()
         if (shadeH != c.height) {
             shadeH = c.height
-            topShader = LinearGradient(0f, 0f, 0f, h * 0.18f, Color.argb(150, 0, 0, 0), 0, Shader.TileMode.CLAMP)
+            topShader = LinearGradient(0f, 0f, 0f, h * 0.27f, Color.argb(165, 0, 0, 0), 0, Shader.TileMode.CLAMP)
             bottomShader = LinearGradient(0f, h * 0.62f, 0f, h, 0, Color.argb(185, 0, 0, 0), Shader.TileMode.CLAMP)
         }
         shade.shader = topShader
-        c.drawRect(0f, 0f, w, h * 0.18f, shade)
+        c.drawRect(0f, 0f, w, h * 0.27f, shade)
         shade.shader = bottomShader
         c.drawRect(0f, h * 0.62f, w, h, shade)
         shade.shader = null
@@ -210,6 +212,7 @@ class DashRenderer {
         if (!overlay) scene.draw(c, d, live, s.cal.redline)
         drawHeader(c, s, stale)
         val accent = Accent.color(d.rpm, s.cal.redline, live)
+        drawMusic(c, if (live) accent else TEAL)
         // Rupteur : cadre rouge qui clignote (la version 2D le dessine elle-même)
         if (overlay && live && d.rpm >= s.cal.redline && (SystemClock.elapsedRealtime() / 125) % 2 == 0L) {
             stroke.strokeWidth = 10f
@@ -257,6 +260,49 @@ class DashRenderer {
         }
         val afrText = if (live && afr != null) fmt1(afr) else "--.-"
         c.drawText(afrText, VW - 24f - value.measureText(afrText), 104f, value)
+    }
+
+    private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val clip = Path()
+
+    /** Morceau en cours (Spotify ou autre) : pochette, titre, artiste, avancement. */
+    private fun drawMusic(c: Canvas, accent: Int) {
+        val title = MusicRelay.title ?: return
+        val x = 20f
+        val y = 38f
+        val size = 58f
+        rect.set(x, y, x + size, y + size)
+        val art = MusicRelay.art
+        if (art != null) {
+            clip.reset()
+            clip.addRoundRect(rect, 8f, 8f, Path.Direction.CW)
+            c.save()
+            c.clipPath(clip)
+            c.drawBitmap(art, null, rect, artPaint)
+            c.restore()
+        } else {
+            fill.color = PANEL
+            c.drawRoundRect(rect, 8f, 8f, fill)
+            setLabel(30f, accent, 0f)
+            label.textAlign = Paint.Align.CENTER
+            c.drawText("♪", x + size / 2f, y + size / 2f + 11f, label)
+            label.textAlign = Paint.Align.LEFT
+        }
+        val tx = x + size + 12f
+        value.textSize = 23f
+        value.color = TEXT
+        c.drawText(fit(value, title, 330f), tx, y + 21f, value)
+        setLabel(16f, MUTED, 0.02f)
+        val sub = listOfNotNull(if (MusicRelay.playing) null else "En pause", MusicRelay.artist?.takeIf { it.isNotBlank() })
+            .joinToString("   ")
+        if (sub.isNotEmpty()) c.drawText(fit(label, sub, 330f), tx, y + 42f, label)
+        val p = MusicRelay.progress() ?: return
+        rect.set(tx, y + 51f, tx + 240f, y + 54f)
+        fill.color = TRACK
+        c.drawRoundRect(rect, 2f, 2f, fill)
+        rect.right = tx + 240f * p
+        fill.color = accent
+        c.drawRoundRect(rect, 2f, 2f, fill)
     }
 
     // ---------------------------------------------------------- page principale
@@ -551,6 +597,13 @@ class DashRenderer {
         label.color = color
         label.letterSpacing = spacing
         label.textAlign = Paint.Align.LEFT
+    }
+
+    private fun fit(p: Paint, text: String, maxWidth: Float): String {
+        if (p.measureText(text) <= maxWidth) return text
+        var t = text
+        while (t.length > 1 && p.measureText("$t...") > maxWidth) t = t.dropLast(1)
+        return "$t..."
     }
 
     private fun ellipsize(text: String, maxWidth: Float): String {

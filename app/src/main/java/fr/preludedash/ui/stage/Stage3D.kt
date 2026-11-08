@@ -26,6 +26,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
+import kotlin.random.Random
 
 /**
  * Le monde 3D de la page d'accueil (Filament, sur la carte graphique).
@@ -80,6 +81,12 @@ class Stage3D(private val engine: Engine, ctx: Context) {
     private val scroll = IntArray(3)
     private val scrollPeriod = floatArrayOf(12f, 30f, 120f)
     private val accentMi = ArrayList<MaterialInstance>()
+
+    // Circulation : deux voitures en face, deux devant sur la file de droite
+    private val traffic = IntArray(4)
+    private val trafficX = floatArrayOf(60f, 150f, 35f, 95f)
+    private val trafficZ = floatArrayOf(-3.95f, -7.45f, 3.05f, 3.05f)
+    private val trafficOncoming = booleanArrayOf(true, true, false, false)
 
     // Lumières
     private val garageLights = ArrayList<Int>()
@@ -138,7 +145,7 @@ class Stage3D(private val engine: Engine, ctx: Context) {
         garageIbl = KTX1Loader.createIndirectLight(engine, readAsset(ctx, "garage_ibl.ktx"))
         nightIbl = KTX1Loader.createIndirectLight(engine, readAsset(ctx, "night_ibl.ktx"))
         garageIbl.indirectLight?.intensity = 1.0f
-        nightIbl.indirectLight?.intensity = 0.35f
+        nightIbl.indirectLight?.intensity = 0.4f
 
         // Ordre de dessin des surfaces transparentes : reflet, sol, plateau, ombre, puis le reste
         renderables(mirror, priority = 1, cast = false, receive = false)
@@ -164,6 +171,7 @@ class Stage3D(private val engine: Engine, ctx: Context) {
         scroll[0] = route.getFirstEntityByName("scroll_12")
         scroll[1] = route.getFirstEntityByName("scroll_30")
         scroll[2] = route.getFirstEntityByName("scroll_120")
+        for (k in traffic.indices) traffic[k] = route.getFirstEntityByName("traffic_$k")
         for (name in arrayOf("accent_strip", "accent_ring")) {
             val e = garage.getFirstEntityByName(name)
             if (e == 0) continue
@@ -322,8 +330,10 @@ class Stage3D(private val engine: Engine, ctx: Context) {
                 density = 0.03f
                 height = 0f
                 heightFalloff = 0.04f
-                color = floatArrayOf(0.045f, 0.035f, 0.06f)
+                color = floatArrayOf(0.06f, 0.025f, 0.07f)
                 maximumOpacity = 0.95f
+                // le ciel, le soleil et la silhouette de la ville restent nets
+                cutOffDistance = 350f
             }
         }
         inScene = m
@@ -386,6 +396,7 @@ class Stage3D(private val engine: Engine, ctx: Context) {
         val engineOn = live && rpm > 300
 
         placeCar(rpmK)
+        if (mode == Mode.ROUTE) moveTraffic(dt)
         updateLights(Accent.color(rpmSmooth.toInt(), redline, live), rpmK, limiter, flash, engineOn)
         placeCamera(rpmK)
     }
@@ -428,6 +439,21 @@ class Stage3D(private val engine: Engine, ctx: Context) {
                 if (scroll[k] == 0) continue
                 tm.setTransform(tm.getInstance(scroll[k]), translate(-(odo % scrollPeriod[k]), 0f, 0f))
             }
+        }
+    }
+
+    private fun moveTraffic(dt: Float) {
+        for (k in traffic.indices) {
+            val e = traffic[k]
+            if (e == 0) continue
+            // En face : 50 km/h vers nous. Devant : un peu moins vite que nous, ou 30 km/h à l'arrêt
+            val rel = if (trafficOncoming[k]) -(13.9f + speed) else max(8f, speed * 0.9f + 1.5f) - speed
+            var x = trafficX[k] + rel * dt
+            if (x < -40f) x = 200f + Random.nextFloat() * 90f
+            if (x > 280f) x = -35f
+            trafficX[k] = x
+            mul(translate(x, 0f, trafficZ[k]), rotY(if (trafficOncoming[k]) PI.toFloat() else 0f), tmpA)
+            tm.setTransform(tm.getInstance(e), tmpA)
         }
     }
 
@@ -490,9 +516,10 @@ class Stage3D(private val engine: Engine, ctx: Context) {
             val ang = PI + 0.16 + 0.04 * sin(time * 0.37)
             val dist = 7.0 - 0.6 * sp + (accel * 0.05f).coerceIn(-0.3f, 0.5f)
             camera.setProjection(38.0 + 10.0 * sp, aspect, 0.2, 1200.0, Camera.Fov.VERTICAL)
+            // Visée un peu haute : on voit le soleil couchant au bout de la rue
             camera.lookAt(
-                1.0 + dist * cos(ang) + jx, 1.85 + jy, dist * sin(ang),
-                2.2, 0.75, 0.1,
+                1.0 + dist * cos(ang) + jx, 1.9 + jy, dist * sin(ang),
+                2.2, 1.3, 0.1,
                 0.0, 1.0, 0.0,
             )
         }
