@@ -15,7 +15,7 @@ import kotlin.math.sin
 /**
  * Égaliseur en rideau en haut de l'écran, à la suite de la pochette : de fines lignes qui pendent
  * du bord supérieur et s'effacent en descendant, pour se fondre dans le décor.
- * Ambiance nightcore / lofi : rose, lavande et bleu ciel pastel, petites crêtes qui retombent.
+ * Ambiance nightcore / lofi : rose, lavande et bleu ciel pastel, halo doux.
  *
  * Basses à gauche (lignes longues), aigus à droite (lignes courtes), comme sur une chaîne hi-fi.
  * La ligne turquoise du bord supérieur montre l'avancement du morceau.
@@ -27,8 +27,6 @@ class SpectrumCurtain(private val bands: Int = 80) {
 
     private val level = FloatArray(bands)
     private val smooth = FloatArray(bands)
-    private val peak = FloatArray(bands)
-    private val hold = FloatArray(bands)
     private val freq = FloatArray(bands)   // 0 = basses (à gauche), 1 = aigus (à droite)
     private val env = FloatArray(bands)    // longueur maximale de chaque ligne
     private val f1 = FloatArray(bands) { 0.9f + 2.2f * hash(it * 3 + 1) }
@@ -42,7 +40,6 @@ class SpectrumCurtain(private val bands: Int = 80) {
     private val glow = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ceilGlow = Paint()
     private val line = Paint()
-    private val cap = Paint(Paint.ANTI_ALIAS_FLAG)
     private var shaderLen = -1f
 
     // Palette pastel
@@ -84,11 +81,6 @@ class SpectrumCurtain(private val bands: Int = 80) {
                 c.drawRoundRect(cx - gw / 2f, 0f, cx + gw / 2f, len + 3f * unit, gw / 2f, gw / 2f, glow)
                 c.drawRoundRect(cx - lw / 2f, 0f, cx + lw / 2f, len, lw / 2f, lw / 2f, bar)
             }
-            val pk = peak[b] * env[b] * maxLen
-            if (peak[b] > 0.04f && pk > len + 2f * unit) {
-                cap.alpha = (220 * (1f - pk / maxLen * 0.7f)).toInt().coerceIn(0, 255)
-                c.drawCircle(cx, pk, 1.6f * unit, cap)
-            }
         }
 
     }
@@ -121,7 +113,6 @@ class SpectrumCurtain(private val bands: Int = 80) {
             0f, 0f, 0f, 14f * unit,
             intArrayOf(alpha(teal, 80), alpha(teal, 0)), null, Shader.TileMode.CLAMP,
         )
-        cap.color = Color.rgb(255, 225, 245)
     }
 
     private fun update(dt: Float, playing: Boolean) {
@@ -146,14 +137,6 @@ class SpectrumCurtain(private val bands: Int = 80) {
             val l = level[max(0, b - 1)]
             val r = level[min(bands - 1, b + 1)]
             smooth[b] = 0.2f * l + 0.6f * level[b] + 0.2f * r
-            if (smooth[b] >= peak[b]) {
-                peak[b] = smooth[b]
-                hold[b] = 0.5f
-            } else if (hold[b] > 0f) {
-                hold[b] -= dt
-            } else {
-                peak[b] = max(0f, peak[b] - dt * 0.5f)
-            }
         }
     }
 

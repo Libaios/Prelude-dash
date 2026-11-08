@@ -115,6 +115,9 @@ class DashRenderer {
     /** Largeur virtuelle de l'image en cours : VW, ou plus sur la page 3D d'un écran large. */
     private var vw = VW
 
+    /** Décalage vers le bas de l'en-tête (état de la liaison) quand le bandeau musique est affiché. */
+    private var headerDy = 0f
+
     /**
      * [area] = zone utile (hors barres d'Android Auto). Le fond est peint sur tout le canevas.
      * [overlay] : la page 3D est rendue à part (carte graphique), on ne dessine que les infos
@@ -138,8 +141,17 @@ class DashRenderer {
         val ox = if (spread) area.left.toFloat() else area.left + (area.width() - VW * scale) / 2f
         val oy = area.top + (area.height() - VH * scale) / 2f
         // Par-dessus la 3D, l'égaliseur part après la pochette et va jusqu'au bord droit de l'écran
-        if (transparent) {
-            drawMusic(canvas, 0f, ox + musicEqStart() * scale, canvas.width.toFloat(), scale)
+        // Par-dessus la 3D, le bandeau musique est calé sur le haut de l'écran lui-même (pas sur la
+        // zone utile, qui sous Android Auto commence sous les boutons) : pochette, titre puis égaliseur
+        headerDy = 0f
+        if (transparent && MusicRelay.title != null) {
+            drawMusic(canvas, 0f, musicEqStart() * scale, canvas.width.toFloat(), scale)
+            canvas.save()
+            canvas.scale(scale, scale)
+            drawMusicHead(canvas)
+            canvas.restore()
+            // L'état de la liaison descend sous la pochette seulement s'il la chevauche
+            headerDy = max(0f, 60f - oy / scale)
         }
         canvas.save()
         canvas.translate(ox, oy)
@@ -229,10 +241,10 @@ class DashRenderer {
         if (!overlay) {
             scene.draw(c, d, live, s.cal.redline)
             drawMusic(c, 0f, musicEqStart(), vw, 1f)
+            drawMusicHead(c)
+            headerDy = if (MusicRelay.title != null) 58f else 0f
         }
-        drawMusicHead(c)
-        // Avec de la musique, l'état de la liaison passe sous la pochette
-        drawHeader(c, s, stale, if (MusicRelay.title != null) 58f else 0f)
+        drawHeader(c, s, stale, headerDy)
         val accent = Accent.color(d.rpm, s.cal.redline, live)
         // Rupteur : cadre rouge qui clignote (la version 2D le dessine elle-même)
         if (overlay && live && d.rpm >= s.cal.redline && (SystemClock.elapsedRealtime() / 125) % 2 == 0L) {

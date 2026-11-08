@@ -44,6 +44,9 @@ object MusicRelay {
     var art: Bitmap? = null
         private set
 
+    private var artSource: Bitmap? = null
+    private var artGeneration = 0
+
     @Volatile
     private var durationMs = 0L
 
@@ -133,6 +136,7 @@ object MusicRelay {
             title = null
             artist = null
             art = null
+            artSource = null
             durationMs = 0L
             playing = false
         }
@@ -140,15 +144,17 @@ object MusicRelay {
     }
 
     private fun readMeta(m: MediaMetadata?) {
-        val newTitle = m?.getString(MediaMetadata.METADATA_KEY_TITLE)
-        val trackChanged = newTitle != title || art == null
-        title = newTitle
+        title = m?.getString(MediaMetadata.METADATA_KEY_TITLE)
         artist = m?.getString(MediaMetadata.METADATA_KEY_ARTIST)
         durationMs = m?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
-        if (trackChanged) {
-            val src = m?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
-                ?: m?.getBitmap(MediaMetadata.METADATA_KEY_ART)
-                ?: m?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        // Spotify envoie d'abord une pochette d'attente (un disque gris), puis la vraie pochette
+        // pour le même morceau : on reprend l'image dès qu'elle change, pas seulement au changement de titre
+        val src = m?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            ?: m?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+            ?: m?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        if (src !== artSource || (src != null && src.generationId != artGeneration)) {
+            artSource = src
+            artGeneration = src?.generationId ?: 0
             art = try {
                 src?.let { Bitmap.createScaledBitmap(it, 256, 256, true) }
             } catch (_: Exception) {
