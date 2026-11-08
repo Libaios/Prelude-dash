@@ -1,0 +1,127 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:buildKotlinToolingMetadata
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:generateReleaseResValues
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:mergeReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:preReleaseUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileRelease
+> Task :app:javaPreCompileReleaseUnitTest
+> Task :card:buildKotlinToolingMetadata
+> Task :card:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :card:preBuild UP-TO-DATE
+> Task :card:preReleaseBuild UP-TO-DATE
+> Task :card:checkReleaseAarMetadata
+> Task :app:processReleaseManifestForPackage
+> Task :card:generateReleaseResValues
+> Task :card:mapReleaseSourceSetPaths
+> Task :card:generateReleaseResources
+> Task :card:mergeReleaseResources
+> Task :card:packageReleaseResources
+> Task :card:createReleaseCompatibleScreenManifests
+> Task :card:parseReleaseLocalResources
+> Task :card:extractDeepLinksRelease
+> Task :card:processReleaseMainManifest
+> Task :card:processReleaseManifest
+> Task :card:processReleaseManifestForPackage
+> Task :card:preReleaseUnitTestBuild UP-TO-DATE
+> Task :card:javaPreCompileRelease
+> Task :card:javaPreCompileReleaseUnitTest
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:processReleaseResources
+> Task :card:processReleaseResources
+> Task :app:mergeReleaseNativeLibs
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:desugarReleaseFileDependencies
+> Task :app:mergeReleaseStartupProfile
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libfilament-jni.so, libfilament-utils-jni.so, libgltfio-jni.so.
+
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseShaders
+> Task :app:mergeExtDexRelease
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:optimizeReleaseResources
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :card:mergeReleaseJniLibFolders
+> Task :card:mergeReleaseNativeLibs NO-SOURCE
+> Task :card:stripReleaseDebugSymbols NO-SOURCE
+> Task :card:extractReleaseNativeSymbolTables NO-SOURCE
+> Task :card:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :card:checkReleaseDuplicateClasses
+> Task :card:desugarReleaseFileDependencies
+> Task :card:mergeReleaseStartupProfile
+> Task :card:mergeReleaseArtProfile
+> Task :card:mergeExtDexRelease
+> Task :card:mergeReleaseShaders
+> Task :card:compileReleaseShaders NO-SOURCE
+> Task :card:generateReleaseAssets UP-TO-DATE
+> Task :card:mergeReleaseAssets
+> Task :card:compressReleaseAssets
+> Task :card:extractReleaseVersionControlInfo
+> Task :card:collectReleaseDependencies
+> Task :card:sdkReleaseDependencyData
+> Task :card:validateSigningRelease
+> Task :card:optimizeReleaseResources
+> Task :card:writeReleaseAppMetadata
+> Task :card:writeReleaseSigningConfigVersions
+> Task :card:compileReleaseKotlin
+> Task :card:compileReleaseJavaWithJavac NO-SOURCE
+> Task :card:bundleReleaseClassesToCompileJar
+> Task :card:bundleReleaseClassesToRuntimeJar
+> Task :card:processReleaseJavaRes
+> Task :card:compileReleaseUnitTestKotlin NO-SOURCE
+> Task :card:compileReleaseUnitTestJavaWithJavac NO-SOURCE
+> Task :card:processReleaseUnitTestJavaRes NO-SOURCE
+> Task :card:testReleaseUnitTest NO-SOURCE
+> Task :card:dexBuilderRelease
+> Task :card:mergeReleaseGlobalSynthetics
+> Task :card:mergeReleaseJavaResource
+> Task :card:mergeDexRelease
+> Task :card:compileReleaseArtProfile
+> Task :card:packageRelease
+> Task :card:createReleaseApkListingFileRedirect
+> Task :card:assembleRelease
+> Task :app:compileReleaseKotlin
+> Task :app:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:bundleReleaseClassesToCompileJar
+> Task :app:processReleaseJavaRes
+> Task :app:bundleReleaseClassesToRuntimeJar
+> Task :app:compileReleaseUnitTestKotlin
+> Task :app:dexBuilderRelease
+> Task :app:compileReleaseUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processReleaseUnitTestJavaRes
+> Task :app:testReleaseUnitTest
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeDexRelease
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794177742751.json
+
+BUILD SUCCESSFUL in 43s
+92 actionable tasks: 92 executed
