@@ -235,7 +235,8 @@ class MainActivity : Activity() {
         col.addView(section("Crédits"))
         col.addView(hint(
             "Modèle 3D : « Honda Prelude 1997 Free » par Black Snow (sketchfab.com/BlackSnow02), " +
-                "licence CC BY 4.0, mis à l'échelle réelle. Rendu 3D : Google Filament (Apache 2.0).",
+                "licence CC BY 4.0, mis à l'échelle réelle, peinture retouchée. Décors (atelier, rue de nuit) " +
+                "générés pour l'appli ; néon en police Poppins (SIL OFL). Rendu 3D : Google Filament (Apache 2.0).",
         ))
 
         col.addView(section("Android Auto"))

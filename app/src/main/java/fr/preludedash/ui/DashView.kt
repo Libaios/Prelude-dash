@@ -1,42 +1,59 @@
 package fr.preludedash.ui
 
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Rect
-import android.view.View
-import fr.preludedash.data.CalStore
-import fr.preludedash.ui.scene.Car3D
+import android.graphics.SurfaceTexture
+import android.view.Surface
+import android.view.TextureView
+import fr.preludedash.ui.stage.DashSurface
 import kotlin.math.min
 
-/** Aperçu du tableau de bord sur le téléphone (même rendu que dans la voiture). */
-class DashView(context: Context) : View(context) {
-    var page = 0
+/** Aperçu du tableau de bord sur le téléphone : exactement le même rendu que dans la voiture. */
+class DashView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
 
-    private val renderer = DashRenderer()
-    private val area = Rect()
-    private val tick = object : Runnable {
-        override fun run() {
-            invalidate()
-            postDelayed(this, 50)
+    private val dash = DashSurface(context, "phone")
+    private var surface: Surface? = null
+
+    var page: Int
+        get() = dash.page
+        set(value) {
+            dash.page = value
         }
-    }
 
     init {
-        // Rendu logiciel : la scène 3D dessine des triangles colorés
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
+        surfaceTextureListener = this
         setOnClickListener { page = (page + 1) % DashRenderer.PAGES }
     }
 
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        Car3D.acquire(context)
-        post(tick)
+    override fun onSurfaceTextureAvailable(st: SurfaceTexture, width: Int, height: Int) {
+        val s = Surface(st)
+        surface = s
+        dash.attach(s, width, height)
+        dash.start()
+    }
+
+    override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {
+        dash.resize(width, height)
+    }
+
+    override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+        dash.stop()
+        dash.detach()
+        surface?.release()
+        surface = null
+        return true
+    }
+
+    override fun onSurfaceTextureUpdated(st: SurfaceTexture) = Unit
+
+    // Appli en arrière-plan : on arrête de dessiner (la voiture a son propre affichage)
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility == VISIBLE && surface != null) dash.start() else dash.stop()
     }
 
     override fun onDetachedFromWindow() {
-        removeCallbacks(tick)
-        Car3D.release()
         super.onDetachedFromWindow()
+        dash.release()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -44,10 +61,5 @@ class DashView(context: Context) : View(context) {
         val maxH = (resources.displayMetrics.heightPixels * 0.8f).toInt()
         val h = min((w * DashRenderer.VH / DashRenderer.VW).toInt(), maxH)
         setMeasuredDimension(w, h)
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        area.set(0, 0, width, height)
-        renderer.draw(canvas, area, DashRenderer.snapshot(page, CalStore.get(context)))
     }
 }

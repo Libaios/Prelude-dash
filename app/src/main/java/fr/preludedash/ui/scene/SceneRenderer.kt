@@ -8,7 +8,7 @@ import android.graphics.Path
 import android.graphics.Shader
 import android.os.SystemClock
 import fr.preludedash.data.EngineData
-import fr.preludedash.shared.Palette
+import fr.preludedash.ui.Accent
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
@@ -23,6 +23,7 @@ import kotlin.math.sqrt
  *
  * Rendu logiciel : projection en perspective, faces triées de la plus lointaine à la plus
  * proche, ombrage plat avec reflet et liseré néon. Dessiné dans le repère 800 x 480.
+ * Sert de secours si la 3D (Filament) ne démarre pas sur le téléphone.
  */
 class SceneRenderer {
     companion object {
@@ -109,7 +110,7 @@ class SceneRenderer {
         setupCamera(t, rpmFrac)
         drawGrid(c, accent)
         drawShadow(c, accent, rpmFrac)
-        drawRealisticOrFallback(c, accent, rpmFrac, t)
+        drawCar(c, accent, rpmFrac, t)
         if (driving && speedKmh > 70) drawSpeedLines(c, t, (speedKmh - 70) / 90f)
         if (live && rpm >= redline) drawShiftFlash(c, t)
     }
@@ -243,30 +244,6 @@ class SceneRenderer {
     }
 
     // --------------------------------------------------------------- voiture
-
-    private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
-    private val dst = android.graphics.RectF(0f, 0f, VW, VH)
-
-    /**
-     * Voiture réaliste (Filament) si disponible ; sinon le modèle simple dessiné ici.
-     * Filament remet lui-même l'image relue dans le bon sens (ligne du haut en premier).
-     */
-    private fun drawRealisticOrFallback(c: Canvas, accent: Int, rpmFrac: Float, t: Float) {
-        if (Car3D.failed) {
-            drawCar(c, accent, rpmFrac, t)
-            return
-        }
-        Car3D.submit(
-            Car3D.Params(
-                eye = cam.copyOf(),
-                target = target.copyOf(),
-                wheelAngle = -wheelAngle,
-                accent = floatArrayOf(Color.red(accent) / 255f, Color.green(accent) / 255f, Color.blue(accent) / 255f),
-            ),
-        )
-        val frame = Car3D.frame() ?: return
-        c.drawBitmap(frame, null, dst, bitmapPaint)
-    }
 
     private fun drawCar(c: Canvas, accent: Int, rpmFrac: Float, t: Float) {
         // Roues de l'image courante
@@ -426,17 +403,7 @@ class SceneRenderer {
 
     // ---------------------------------------------------------------- outils
 
-    /** Turquoise au repos, orange à 1000 tr/min de la zone rouge, rouge au rupteur. */
-    fun accentColor(rpm: Int, redline: Int, live: Boolean): Int {
-        if (!live) return Palette.BLUE
-        val warn = redline - 1000
-        return when {
-            rpm >= redline -> Palette.RED
-            rpm >= warn -> mix(Palette.AMBER, Palette.RED, (rpm - warn) / 1000f)
-            rpm >= warn - 1500 -> mix(Palette.TEAL, Palette.AMBER, (rpm - (warn - 1500)) / 1500f)
-            else -> Palette.TEAL
-        }
-    }
+    fun accentColor(rpm: Int, redline: Int, live: Boolean): Int = Accent.color(rpm, redline, live)
 
     private fun norm(v: FloatArray) {
         val l = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])

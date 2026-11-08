@@ -2,10 +2,14 @@ package fr.preludedash.ui
 
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
+import android.os.SystemClock
 import fr.preludedash.data.Calibration
 import fr.preludedash.data.EngineData
 import fr.preludedash.link.DataHub
@@ -67,6 +71,12 @@ class DashRenderer {
         val BLUE = Palette.BLUE
         val TEAL = Palette.TEAL
 
+        /** Données fraîches (liaison active ou démo) : sinon tout s'affiche en tirets. */
+        fun isLive(s: Snapshot): Boolean {
+            val stale = s.state != DataHub.State.DEMO && s.ageMs > 1500
+            return !stale && (s.state == DataHub.State.CONNECTED || s.state == DataHub.State.DEMO)
+        }
+
         fun snapshot(page: Int, cal: Calibration) = Snapshot(
             data = DataHub.data,
             state = DataHub.state,
@@ -95,9 +105,19 @@ class DashRenderer {
     }
     private val rect = RectF()
 
-    /** [area] = zone utile (hors barres d'Android Auto). Le fond est peint sur tout le canevas. */
-    fun draw(canvas: Canvas, area: Rect, s: Snapshot) {
-        canvas.drawColor(BG)
+    /**
+     * [area] = zone utile (hors barres d'Android Auto). Le fond est peint sur tout le canevas.
+     * [overlay] : la page 3D est rendue à part (carte graphique), on ne dessine que les infos
+     * par-dessus, sur fond transparent.
+     */
+    fun draw(canvas: Canvas, area: Rect, s: Snapshot, overlay: Boolean = false) {
+        val transparent = overlay && s.page % PAGES == 0
+        if (transparent) {
+            canvas.drawColor(0, PorterDuff.Mode.CLEAR)
+            drawShade(canvas)
+        } else {
+            canvas.drawColor(BG)
+        }
         if (area.width() <= 0 || area.height() <= 0) return
         val scale = min(area.width() / VW, area.height() / VH)
         val ox = area.left + (area.width() - VW * scale) / 2f
@@ -107,7 +127,7 @@ class DashRenderer {
         canvas.scale(scale, scale)
         val stale = s.state != DataHub.State.DEMO && s.ageMs > 1500
         when (s.page % PAGES) {
-            0 -> drawScenePage(canvas, s, stale)
+            0 -> drawScenePage(canvas, s, stale, transparent)
             1 -> {
                 drawHeader(canvas, s, stale)
                 drawMain(canvas, s, stale)
@@ -162,13 +182,41 @@ class DashRenderer {
 
     private val scene = SceneRenderer()
 
+    private val shade = Paint()
+    private var shadeH = -1
+    private var topShader: Shader? = null
+    private var bottomShader: Shader? = null
+
+    /** Dégradés sombres en haut et en bas, pour lire les chiffres par-dessus la 3D. */
+    private fun drawShade(c: Canvas) {
+        val w = c.width.toFloat()
+        val h = c.height.toFloat()
+        if (shadeH != c.height) {
+            shadeH = c.height
+            topShader = LinearGradient(0f, 0f, 0f, h * 0.18f, Color.argb(150, 0, 0, 0), 0, Shader.TileMode.CLAMP)
+            bottomShader = LinearGradient(0f, h * 0.62f, 0f, h, 0, Color.argb(185, 0, 0, 0), Shader.TileMode.CLAMP)
+        }
+        shade.shader = topShader
+        c.drawRect(0f, 0f, w, h * 0.18f, shade)
+        shade.shader = bottomShader
+        c.drawRect(0f, h * 0.62f, w, h, shade)
+        shade.shader = null
+    }
+
     /** Page d'accueil : la Prelude en 3D, avec régime, vitesse et AFR par-dessus. */
-    private fun drawScenePage(c: Canvas, s: Snapshot, stale: Boolean) {
+    private fun drawScenePage(c: Canvas, s: Snapshot, stale: Boolean, overlay: Boolean) {
         val d = s.data
-        val live = !stale && (s.state == DataHub.State.CONNECTED || s.state == DataHub.State.DEMO)
-        scene.draw(c, d, live, s.cal.redline)
+        val live = isLive(s)
+        if (!overlay) scene.draw(c, d, live, s.cal.redline)
         drawHeader(c, s, stale)
-        val accent = scene.accentColor(d.rpm, s.cal.redline, live)
+        val accent = Accent.color(d.rpm, s.cal.redline, live)
+        // Rupteur : cadre rouge qui clignote (la version 2D le dessine elle-même)
+        if (overlay && live && d.rpm >= s.cal.redline && (SystemClock.elapsedRealtime() / 125) % 2 == 0L) {
+            stroke.strokeWidth = 10f
+            stroke.color = Color.argb(210, 255, 60, 60)
+            c.drawRect(5f, 5f, VW - 5f, VH - 5f, stroke)
+            stroke.strokeCap = Paint.Cap.ROUND
+        }
 
         // Régime, en bas à gauche, avec une barre fine
         value.textSize = 72f

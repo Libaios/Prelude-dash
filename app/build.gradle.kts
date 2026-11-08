@@ -52,7 +52,7 @@ android {
     }
 
     // Le modèle 3D et l'éclairage sont lus tels quels
-    androidResources { noCompress += listOf("glb", "ktx") }
+    androidResources { noCompress += listOf("glb", "ktx", "filamat") }
 
     // Code commun avec l'appli Prelude Carte
     sourceSets["main"].java.srcDir("../shared/java")
