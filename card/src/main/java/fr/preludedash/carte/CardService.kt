@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.service.media.MediaBrowserService
+import android.util.Log
 import fr.preludedash.shared.CardSnapshot
 import fr.preludedash.shared.ShareContract
 
@@ -73,10 +74,13 @@ class CardService : MediaBrowserService() {
         handler.post(tick)
     }
 
-    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot =
-        BrowserRoot(ROOT_ID, null)
+    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot {
+        Log.i("PreludeCarte", "connexion de $clientPackageName, indices=${rootHints?.keySet()}")
+        return BrowserRoot(ROOT_ID, null)
+    }
 
     override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaBrowser.MediaItem>>) {
+        Log.i("PreludeCarte", "liste demandée ($parentId)")
         // Un seul élément, pour que l'écran de l'appli musique ne soit pas vide
         val desc = MediaDescription.Builder()
             .setMediaId(ITEM_RESUME)

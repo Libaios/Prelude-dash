@@ -17,11 +17,14 @@ data class CardSnapshot(
     val title: String,
     /** Ligne de sous-titre : l'artiste, sinon l'état de la liaison. */
     val subtitle: String,
-    // Valeurs des bandes latérales (visibles seulement en plein écran)
+    // Valeurs secondaires : régime et MAP dans la colonne, le reste sur les côtés (plein écran)
     val rpm: String = "--",
+    val rpmLevel: Level = Level.NORMAL,
     val map: String = "--",
     val iat: String = "--",
     val batt: String = "--",
+    val ign: String = "--",
+    val duty: String = "--",
 ) {
     enum class Level { NORMAL, COLD, WARN, ALERT }
 
@@ -37,9 +40,12 @@ data class CardSnapshot(
         putString("title", title)
         putString("subtitle", subtitle)
         putString("rpm", rpm)
+        putString("rpmLevel", rpmLevel.name)
         putString("map", map)
         putString("iat", iat)
         putString("batt", batt)
+        putString("ign", ign)
+        putString("duty", duty)
     }
 
     companion object {
@@ -64,9 +70,12 @@ data class CardSnapshot(
             title = b.getString("title") ?: "Prelude Dash",
             subtitle = b.getString("subtitle") ?: "",
             rpm = b.getString("rpm") ?: "--",
+            rpmLevel = level(b.getString("rpmLevel")),
             map = b.getString("map") ?: "--",
             iat = b.getString("iat") ?: "--",
             batt = b.getString("batt") ?: "--",
+            ign = b.getString("ign") ?: "--",
+            duty = b.getString("duty") ?: "--",
         )
 
         private fun level(s: String?): Level = Level.values().firstOrNull { it.name == s } ?: Level.NORMAL

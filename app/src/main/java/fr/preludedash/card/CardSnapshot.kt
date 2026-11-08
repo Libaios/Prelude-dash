@@ -67,9 +67,16 @@ object CardSnapshots {
             },
             subtitle = music?.artistLine ?: status,
             rpm = ((d.rpm + 25) / 50 * 50).toString(),
+            rpmLevel = when {
+                d.rpm >= cal.redline -> Level.ALERT
+                d.rpm >= cal.redline - 1000 -> Level.WARN
+                else -> Level.NORMAL
+            },
             map = d.mapMbar.toString(),
             iat = d.iatC.roundToInt().toString() + "°",
             batt = String.format(Locale.US, "%.1f", d.batteryV),
+            ign = d.ignDeg.roundToInt().toString() + "°",
+            duty = d.dutyPct.roundToInt().toString() + "%",
         )
     }
 }

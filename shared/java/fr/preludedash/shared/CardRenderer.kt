@@ -12,10 +12,10 @@ import android.graphics.Typeface
  *
  * - **Colonne à côté de Waze** : Android Auto agrandit l'image à toute la hauteur de la
  *   colonne et n'en garde que la bande centrale (x de 123 à 389 sur 512, mesuré sur un
- *   écran 1024x600), assombrie, avec titre et boutons sur le bas. On y met l'essentiel :
- *   AFR, eau, éthanol, alerte.
+ *   écran 1024x600), assombrie, avec titre et boutons sous y = 360. On y met l'essentiel :
+ *   alerte, AFR, régime, MAP, eau, éthanol.
  * - **Écran musique plein écran** : l'image carrée est affichée en entier. Les deux bandes
- *   latérales, invisibles dans la colonne, ajoutent régime, MAP, admission et batterie.
+ *   latérales, invisibles dans la colonne, ajoutent admission, avance, batterie, injecteurs.
  *
  * Couleurs poussées au maximum de contraste à cause de l'assombrissement d'Android Auto.
  * Repère de dessin : 512 x 512, mis à l'échelle de [size].
@@ -62,63 +62,68 @@ object CardRenderer {
         val alert = s.alert
         if (alert != null && s.live) {
             fill.color = Palette.RED
-            c.drawRoundRect(RectF(BAND_L, 40f, BAND_R, 92f), 26f, 26f, fill)
+            c.drawRoundRect(RectF(BAND_L, 26f, BAND_R, 70f), 22f, 22f, fill)
             text.typeface = condensedBold
-            text.textSize = 32f
+            text.textSize = 30f
             text.letterSpacing = 0.02f
             text.color = WHITE
-            c.drawText(fit(text, alert, BAND_R - BAND_L - 24f), CX, 77f, text)
+            c.drawText(fit(text, alert, BAND_R - BAND_L - 24f), CX, 58f, text)
         } else {
             text.typeface = medium
-            text.textSize = 26f
+            text.textSize = 22f
             text.letterSpacing = 0.18f
             text.color = LABEL
-            c.drawText("AFR", CX + 10f, 78f, text)
+            c.drawText("AFR", CX + 10f, 58f, text)
             fill.color = when {
                 s.demo -> Palette.BLUE
                 s.live -> Palette.GREEN
                 else -> Palette.AMBER
             }
-            c.drawCircle(CX - 44f, 69f, 8f, fill)
+            c.drawCircle(CX - 38f, 51f, 7f, fill)
         }
 
-        // AFR en très gros
+        // AFR en gros
         text.typeface = condensedBold
         text.letterSpacing = -0.02f
-        text.textSize = 128f
+        text.textSize = 100f
         text.color = when {
             !s.live -> LABEL
             s.afrLevel == CardSnapshot.Level.ALERT -> Palette.RED
             else -> WHITE
         }
-        c.drawText(fit(text, s.afr, BAND_R - BAND_L), CX, 200f, text)
+        c.drawText(fit(text, s.afr, BAND_R - BAND_L), CX, 150f, text)
 
         // Séparateur
         fill.color = Color.rgb(60, 68, 78)
-        c.drawRect(BAND_L + 10f, 224f, BAND_R - 10f, 227f, fill)
+        c.drawRect(BAND_L + 10f, 166f, BAND_R - 10f, 169f, fill)
 
-        // Eau et éthanol, chacun dans sa moitié de bande
+        // Grille 2 x 2 : régime, MAP, eau, éthanol
         val leftX = (BAND_L + CX) / 2f
         val rightX = (CX + BAND_R) / 2f
+        cell(c, text, leftX, 198f, "TR/MIN", s.rpm, levelColor(s.rpmLevel, s.live))
+        cell(c, text, rightX, 198f, "MAP", s.map, if (s.live) WHITE else LABEL)
+        cell(c, text, leftX, 288f, "EAU", s.ect + "°", levelColor(s.ectLevel, s.live))
+        cell(c, text, rightX, 288f, "E85", s.eth + "%", if (s.live) WHITE else LABEL)
+    }
+
+    private fun cell(c: Canvas, text: Paint, cx: Float, top: Float, label: String, value: String, color: Int) {
         text.typeface = medium
-        text.textSize = 20f
+        text.textSize = 18f
         text.letterSpacing = 0.12f
         text.color = LABEL
-        c.drawText("EAU", leftX, 260f, text)
-        c.drawText("E85", rightX, 260f, text)
-
+        c.drawText(label, cx, top, text)
         text.typeface = condensedBold
         text.letterSpacing = -0.02f
-        text.textSize = 64f
-        text.color = if (!s.live) LABEL else when (s.ectLevel) {
-            CardSnapshot.Level.ALERT -> Palette.RED
-            CardSnapshot.Level.WARN -> Palette.AMBER
-            CardSnapshot.Level.COLD -> Palette.BLUE
-            CardSnapshot.Level.NORMAL -> WHITE
-        }
-        c.drawText(fit(text, s.ect + "°", 118f), leftX, 322f, text)
-        text.color = if (s.live) WHITE else LABEL
-        c.drawText(fit(text, s.eth + "%", 118f), rightX, 322f, text)
+        text.textSize = 52f
+        text.color = color
+        c.drawText(fit(text, value, 116f), cx, top + 54f, text)
+    }
+
+    private fun levelColor(l: CardSnapshot.Level, live: Boolean): Int = if (!live) LABEL else when (l) {
+        CardSnapshot.Level.ALERT -> Palette.RED
+        CardSnapshot.Level.WARN -> Palette.AMBER
+        CardSnapshot.Level.COLD -> Palette.BLUE
+        CardSnapshot.Level.NORMAL -> WHITE
     }
 
     /** Bandes latérales : visibles uniquement quand l'image est affichée en entier. */
@@ -127,10 +132,10 @@ object CardRenderer {
         c.drawRoundRect(RectF(8f, 40f, 120f, 472f), 18f, 18f, fill)
         c.drawRoundRect(RectF(392f, 40f, 504f, 472f), 18f, 18f, fill)
 
-        side(c, text, LEFT_CX, 100f, "TR/MIN", s.rpm, s.live)
-        side(c, text, LEFT_CX, 300f, "MAP", s.map, s.live)
-        side(c, text, RIGHT_CX, 100f, "ADM.", s.iat, s.live)
-        side(c, text, RIGHT_CX, 300f, "BATT", s.batt, s.live)
+        side(c, text, LEFT_CX, 100f, "ADM.", s.iat, s.live)
+        side(c, text, LEFT_CX, 300f, "AVANCE", s.ign, s.live)
+        side(c, text, RIGHT_CX, 100f, "BATT", s.batt, s.live)
+        side(c, text, RIGHT_CX, 300f, "INJ.", s.duty, s.live)
     }
 
     private fun side(c: Canvas, text: Paint, cx: Float, top: Float, label: String, value: String, live: Boolean) {

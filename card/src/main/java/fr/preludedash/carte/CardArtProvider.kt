@@ -1,11 +1,16 @@
 package fr.preludedash.carte
 
 import android.content.ContentProvider
+import android.content.ContentResolver
 import android.content.ContentValues
+import android.content.res.AssetFileDescriptor
 import android.database.Cursor
 import android.graphics.Bitmap
+import android.graphics.Point
 import android.net.Uri
+import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import fr.preludedash.shared.CardRenderer
 import java.io.FileNotFoundException
 
@@ -17,12 +22,26 @@ class CardArtProvider : ContentProvider() {
 
     companion object {
         const val AUTHORITY = "fr.preludedash.carte.art"
+        private const val TAG = "PreludeCarte"
         private const val SIZE = 512
     }
 
     override fun onCreate(): Boolean = true
 
+    /**
+     * Journal de test : on note si Android Auto demande une taille d'image différente selon
+     * qu'il affiche la colonne ou l'écran plein. Si c'est le cas, on pourra dessiner un écran
+     * complètement différent pour le plein écran. Lecture : adb logcat -s PreludeCarte
+     */
+    override fun openTypedAssetFile(uri: Uri, mimeTypeFilter: String, opts: Bundle?): AssetFileDescriptor? {
+        @Suppress("DEPRECATION")
+        val size: Point? = opts?.getParcelable(ContentResolver.EXTRA_SIZE)
+        Log.i(TAG, "image ${uri.lastPathSegment} demandée (typed) taille=$size type=$mimeTypeFilter par=$callingPackage")
+        return super.openTypedAssetFile(uri, mimeTypeFilter, opts)
+    }
+
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
+        Log.i(TAG, "image ${uri.lastPathSegment} demandée (openFile) par=$callingPackage")
         val id = uri.lastPathSegment?.toIntOrNull()
         val snapshot = id?.let { CardFrames.get(it) } ?: throw FileNotFoundException("image $id inconnue")
         val bitmap = CardRenderer.render(snapshot, SIZE)
