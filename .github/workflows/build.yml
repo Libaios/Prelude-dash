@@ -1,0 +1,57 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Tests et compilation
+        shell: bash
+        run: gradle --no-daemon --stacktrace testReleaseUnitTest assembleRelease 2>&1 | tee build.log
+
+      - name: Renommer l'APK
+        run: cp app/build/outputs/apk/release/app-release.apk PreludeDash.apk
+
+      - name: Publier l'APK (onglet Releases)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Prelude Dash ${{ github.run_number }}
+          body: "APK prêt à installer avec UnknownAuto. Version 1.0.${{ github.run_number }}."
+          files: PreludeDash.apk
+          make_latest: true
+
+      # Résumé du build poussé sur une branche à part, pour diagnostiquer sans ouvrir GitHub
+      - name: Rapport de build
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/report
+          echo "${{ job.status }} run=${{ github.run_number }} sha=${{ github.sha }}" > /tmp/report/status.txt
+          if [ -f build.log ]; then tail -n 400 build.log > /tmp/report/build-tail.log; fi
+          git config user.name "build-bot"
+          git config user.email "build-bot@users.noreply.github.com"
+          git checkout --orphan ci-report
+          git rm -rf --quiet . || true
+          cp /tmp/report/* .
+          git add status.txt build-tail.log 2>/dev/null || git add status.txt
+          git commit -m "build ${{ github.run_number }}: ${{ job.status }}"
+          git push -f origin ci-report
